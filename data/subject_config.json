@@ -1,0 +1,22 @@
+{
+  "score_subjects": [
+    "Toán",
+    "Ngữ văn",
+    "Ngoại ngữ",
+    "Khoa học tự nhiên",
+    "Lịch sử và Địa lí",
+    "Tin học",
+    "Công nghệ",
+    "Giáo dục công dân"
+  ],
+  "comment_subjects": [
+    "Giáo dục thể chất",
+    "Nghệ thuật",
+    "Hoạt động trải nghiệm hướng nghiệp"
+  ],
+  "school_year": "2025-2026",
+  "semesters": ["HK1", "HK2"],
+  "classes": ["8A1", "8A2", "8A3"],
+  "num_students": 300,
+  "num_regular_scores": 3
+}
