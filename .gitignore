@@ -18,9 +18,18 @@ env/
 .DS_Store
 Thumbs.db
 
-# Project specific data and models (can be re-generated/re-trained)
-data/raw/
-data/processed/
-models/*.pkl
-reports/
+# Keep folder structures but ignore their generated contents
+data/raw/*
+!data/raw/.gitkeep
+
+data/processed/*
+!data/processed/.gitkeep
+
+models/*
+!models/.gitkeep
+
+reports/*
 !reports/.gitkeep
+
+assets/screenshots/*
+!assets/screenshots/.gitkeep
