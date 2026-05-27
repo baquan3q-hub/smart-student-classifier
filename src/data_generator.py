@@ -37,22 +37,27 @@ def _assign_classes(student_ids: list[str], classes: list[str]) -> dict[str, str
     return assignments
 
 
-def _generate_student_tier(rng: np.random.Generator) -> str:
+def _generate_student_tier(rng: np.random.Generator, data_profile: str = "balanced") -> str:
     """
-    Sinh tier học lực cho học sinh để đảm bảo phân bố nhãn hợp lý.
+    Sinh tier học lực cho học sinh dựa trên cấu hình phân phối dữ liệu.
     
-    Tỷ lệ mục tiêu:
-    - Tốt: ~20%
-    - Khá: ~28%
-    - Đạt: ~26%
-    - Chưa đạt: ~16%
-    - Nghịch cảnh Tốt (học lực Tốt nhưng 2 môn nhận xét Chưa đạt): ~5%
-    - Nghịch cảnh Khá (học lực Khá nhưng 2 môn nhận xét Chưa đạt): ~5%
+    Các cấu hình:
+    - balanced: tỷ lệ thực tế cân bằng.
+    - high_performing: đa số học sinh học tốt (chọn lọc).
+    - at_risk: đa số học sinh yếu kém, cần hỗ trợ.
+    - mid_semester: tỷ lệ giống balanced nhưng sẽ ẩn điểm cuối kỳ ở bước sau.
     """
-    return rng.choice(
-        ["tot", "kha", "dat", "chua_dat", "adversarial_tot", "adversarial_kha"],
-        p=[0.20, 0.28, 0.26, 0.16, 0.05, 0.05],
-    )
+    if data_profile == "high_performing":
+        tiers = ["tot", "kha", "dat", "chua_dat", "adversarial_tot", "adversarial_kha"]
+        p = [0.50, 0.33, 0.11, 0.02, 0.03, 0.01]
+    elif data_profile == "at_risk":
+        tiers = ["tot", "kha", "dat", "chua_dat", "adversarial_tot", "adversarial_kha"]
+        p = [0.03, 0.10, 0.30, 0.45, 0.06, 0.06]
+    else:  # balanced hoặc mid_semester
+        tiers = ["tot", "kha", "dat", "chua_dat", "adversarial_tot", "adversarial_kha"]
+        p = [0.20, 0.28, 0.26, 0.16, 0.05, 0.05]
+
+    return rng.choice(tiers, p=p)
 
 
 def _generate_scores_for_tier(
@@ -193,6 +198,7 @@ def _generate_behavior_for_tier(
 def generate_raw_data(
     num_students: int = NUM_STUDENTS,
     random_state: int = 42,
+    data_profile: str = "balanced",
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Sinh toàn bộ dữ liệu thô cho hệ thống.
@@ -200,6 +206,7 @@ def generate_raw_data(
     Args:
         num_students: Số lượng học sinh cần sinh.
         random_state: Seed cho reproducibility.
+        data_profile: Cấu hình phân phối dữ liệu (balanced, high_performing, at_risk, mid_semester).
 
     Returns:
         (profiles_df, scores_df, comments_df)
@@ -210,11 +217,13 @@ def generate_raw_data(
     class_assignments = _assign_classes(student_ids, CLASSES)
 
     # Gán tier cho mỗi học sinh (cố định qua cả 2 kỳ)
-    student_tiers = {sid: _generate_student_tier(rng) for sid in student_ids}
+    student_tiers = {sid: _generate_student_tier(rng, data_profile) for sid in student_ids}
 
     profiles_rows = []
     scores_rows = []
     comments_rows = []
+
+    is_mid_sem = data_profile == "mid_semester"
 
     for sid in student_ids:
         tier = student_tiers[sid]
@@ -231,6 +240,11 @@ def generate_raw_data(
                 regular, midterm, final = _generate_scores_for_tier(
                     tier, rng, NUM_REGULAR_SCORES
                 )
+                
+                # Nếu là dữ liệu giữa kỳ, không có điểm thi cuối kỳ (gán NaN)
+                if is_mid_sem:
+                    final = np.nan
+                    
                 dtb_mhk = calculate_dtb_mhk(regular, midterm, final)
                 dtb_list.append(dtb_mhk)
 
@@ -324,6 +338,7 @@ def generate_raw_data(
 def generate_all_data(
     num_students: int = NUM_STUDENTS,
     random_state: int = 42,
+    data_profile: str = "balanced",
     save: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
@@ -332,6 +347,7 @@ def generate_all_data(
     Args:
         num_students: Số lượng học sinh.
         random_state: Seed cho reproducibility.
+        data_profile: Cấu hình phân phối dữ liệu (balanced, high_performing, at_risk, mid_semester).
         save: Có lưu file CSV hay không.
 
     Returns:
@@ -340,11 +356,13 @@ def generate_all_data(
     ensure_directories()
 
     # Sinh raw data
-    profiles_df, scores_df, comments_df = generate_raw_data(num_students, random_state)
+    profiles_df, scores_df, comments_df = generate_raw_data(num_students, random_state, data_profile)
 
     # Sinh processed features
     from src.feature_engineering import build_student_features
-    features_df = build_student_features(profiles_df, scores_df, comments_df)
+    period_val = "MID_SEMESTER" if data_profile == "mid_semester" else "YEAR"
+    features_df = build_student_features(profiles_df, scores_df, comments_df, period=period_val)
+
 
     if save:
         # Lưu raw data
@@ -356,3 +374,4 @@ def generate_all_data(
         features_df.to_csv(PROCESSED_DATA_DIR / "student_features.csv", index=False, encoding="utf-8-sig")
 
     return profiles_df, scores_df, comments_df, features_df
+

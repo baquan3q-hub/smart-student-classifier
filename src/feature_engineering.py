@@ -142,10 +142,20 @@ def build_student_features(
 
         # Lấy dòng profile cuối cùng (HK2 nếu có, hoặc HK1)
         profile = student_profiles.iloc[-1]
+        active_semester = profile["semester"]
 
-        # Aggregate scores (tất cả kỳ nếu YEAR)
-        semester_filter = None if period == "YEAR" else period
+        # Nếu là giữa kỳ (MID_SEMESTER), chỉ tổng hợp học kỳ hiện tại
+        # để đảm bảo đúng số môn của 1 học kỳ (8 môn điểm số, 3 môn nhận xét)
+        if period == "MID_SEMESTER":
+            semester_filter = active_semester
+        elif period == "YEAR":
+            semester_filter = None
+        else:
+            semester_filter = period
+            
         score_agg = _aggregate_scores(scores_df, sid, semester_filter)
+
+
         comment_agg = _aggregate_comments(comments_df, sid, semester_filter)
 
         # Classify bằng Rule Engine

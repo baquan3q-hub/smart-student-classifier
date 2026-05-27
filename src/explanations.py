@@ -194,3 +194,61 @@ DTB_mcn = (DTB_HK1 + 2 × DTB_HK2) / 3
 
 Rule Engine vừa là **logic phân loại chính thức**, vừa là **baseline** để tạo nhãn `learning_result_label` cho supervised learning. Machine Learning học từ nhãn này.
 """
+
+
+def explain_qualitative_metrics() -> str:
+    """Trả về giải thích cách số hóa các chỉ số định tính trong giáo dục."""
+    return r"""
+
+### 📐 Số hóa & Quy đổi các Chỉ số Định tính trong Giáo dục (EdTech)
+
+Trong nghiên cứu sư phạm và các hệ thống quản lý học tập (LMS), một thách thức lớn là **làm thế nào để chuyển đổi các quan sát định tính (nhận xét, hành vi) thành dữ liệu số (định lượng)** phục vụ cho mô hình Machine Learning. 
+
+Hệ thống của chúng tôi áp dụng các phương pháp tiêu chuẩn hóa quốc tế và nội quy học đường Việt Nam như sau:
+
+---
+
+#### 1. Các chỉ số Định lượng Tự động (Automated Quantitative Metrics)
+Các chỉ số này được hệ thống phần mềm (LMS/SIS) tự động ghi nhận và tính toán:
+*   **Tỷ lệ chuyên cần (`attendance_rate` %)**: 
+    $$\text{Tỷ lệ} = \frac{\text{Số buổi đi học thực tế}}{\text{Tổng số buổi học quy định}} \times 100$$
+    *Đây là chỉ số thép pháp lý. Nếu tỷ lệ < 75% (vắng > 45 buổi), hệ thống tự động kích hoạt Cảnh báo đỏ do vi phạm Điều 12 Thông tư 22.*
+*   **Tỷ lệ hoàn thành bài tập (`assignment_completion_rate` %)**:
+    $$\text{Tỷ lệ} = \frac{\text{Số bài tập đã nộp}}{\text{Tổng số bài tập được giao}} \times 100$$
+    *Đo lường trực tiếp tính tự giác và ý thức học tập hàng ngày ngoài giờ lên lớp.*
+
+---
+
+#### 2. Số hóa các chỉ số Định tính qua Rubrics (Rubrics-Based Quantization)
+Đối với các chỉ số mang tính chủ quan như thái độ hay hành vi, nhà trường sử dụng **Phiếu đánh giá tiêu chí (Rubrics)** để quy đổi sang thang điểm 10:
+
+*   **Điểm tham gia xây dựng bài (`participation_score` - Thang điểm 1-10)**:
+    *   **9.0 - 10.0 (Xuất sắc)**: Phát biểu hăng hái ($\ge 3$ lần/tiết), luôn dẫn dắt nhóm, chủ động hỗ trợ bạn học.
+    *   **7.0 - 8.9 (Khá/Tích cực)**: Phát biểu 1-2 lần/tiết, tham gia đầy đủ hoạt động thảo luận nhóm.
+    *   **5.0 - 6.9 (Trung bình/Thụ động)**: Chỉ phát biểu khi giáo viên gọi chỉ định, ít đóng góp vào bài tập nhóm.
+    *   **Dưới 5.0 (Yếu)**: Không tập trung, thường xuyên làm việc riêng, không hợp tác nhóm.
+
+*   **Điểm nề nếp hành vi (`behavior_score` - Thang điểm 1-10)**:
+    *   *Tính toán*: Dựa trên Hồ sơ nề nếp học sinh và Sổ ghi đầu bài.
+    *   **9.0 - 10.0**: Thực hiện nghiêm túc nội quy, đi học đúng giờ, không vi phạm lỗi nề nếp, gương mẫu.
+    *   **7.0 - 8.9**: Vi phạm lỗi nhẹ $< 2$ lần (đi muộn, sai đồng phục) nhưng đã sửa chữa tích cực.
+    *   **5.0 - 6.9**: Vi phạm 3-5 lần lỗi nề nếp trung bình, có thái độ phục thiện trung bình.
+    *   **Dưới 5.0**: Vi phạm nghiêm trọng (gian lận thi cử, gây gổ) hoặc thường xuyên tái phạm lỗi nề nếp.
+
+*   **Điểm đánh giá toàn diện của Giáo viên (`teacher_evaluation_score` - Thang điểm 1-10)**:
+    *   *Ý nghĩa*: Đánh giá toàn diện của GVCN và GV bộ môn về tiềm năng phát triển, nghị lực vượt khó học tập và năng lực cốt lõi khác.
+    *   *Quy đổi*: Giáo viên đánh giá trên Thang đo năng lực 5 mức độ (Rất tốt: 10, Tốt: 8, Khá: 6, Đạt: 4, Chưa đạt: 2) sau đó kết hợp điểm trung bình cộng của các giáo viên cùng dạy.
+
+---
+
+#### 3. Các đặc trưng thống kê Sư phạm nâng cao (Engineered Pedagogical Features)
+Đây là các biến số được AI chế tạo từ điểm số để nắm bắt các trạng thái học tập nâng cao:
+*   **Độ lệch chuẩn điểm số (`std_score`) - Đo lường mức độ "Học lệch"**:
+    *   Nếu `std_score` thấp ($< 1.0$): Học sinh học đều tất cả các môn.
+    *   Nếu `std_score` cao ($\ge 1.8$): Học sinh học lệch cực kỳ nghiêm trọng (ví dụ: Toán 10 nhưng Ngữ văn 3.5). 
+    *   *Ý nghĩa đối với AI*: Mô hình Machine Learning học được rằng học sinh học lệch cực kỳ nguy hiểm, vì chỉ cần 1 môn dưới 3.5 là sẽ bị đánh tụt xuống xếp loại Chưa đạt ngay lập tức ( safeguard Thông tư 22).
+*   **Mức tiến bộ học lực (`progress_delta`)**:
+    $$\text{progress\_delta} = \text{ĐTB học kỳ này} - \text{ĐTB học kỳ trước}$$
+    *Cho biết xu hướng phát triển của học sinh. Điểm giảm mạnh (delta âm lớn) là dấu hiệu học sinh đang gặp khủng hoảng tâm lý hoặc gia đình, cần giáo viên kích hoạt cảnh báo sớm hỗ trợ.*
+"""
+

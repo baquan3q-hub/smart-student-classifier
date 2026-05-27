@@ -231,3 +231,87 @@ def plot_score_distribution(df: pd.DataFrame) -> go.Figure:
     fig.update_traces(opacity=0.7)
 
     return fig
+
+
+def plot_risk_level_distribution(df: pd.DataFrame) -> go.Figure:
+    """Vẽ biểu đồ tròn thể hiện phân bố mức độ rủi ro EWS."""
+    # Bảng màu cho 4 mức rủi ro EWS
+    risk_colors = {
+        "🔴 Cao": "#EF4444",
+        "🟠 Cảnh báo": "#F59E0B",
+        "🟡 Theo dõi": "#3B82F6",
+        "🟢 An toàn": "#10B981",
+    }
+    
+    levels = ["🔴 Cao", "🟠 Cảnh báo", "🟡 Theo dõi", "🟢 An toàn"]
+    counts = df["risk_level"].value_counts().reindex(levels, fill_value=0)
+
+    fig = go.Figure(data=[
+        go.Pie(
+            labels=counts.index,
+            values=counts.values,
+            marker=dict(colors=[risk_colors.get(label, "#6B7280") for label in counts.index]),
+            textinfo="label+percent+value",
+            textfont=dict(size=13),
+            hole=0.35,
+        )
+    ])
+
+    fig.update_layout(
+        title="Tỷ lệ phân cấp rủi ro học đường (EWS)",
+        template="plotly_white",
+        height=400,
+    )
+
+    return fig
+
+
+def plot_risk_by_class(df: pd.DataFrame) -> go.Figure:
+    """Vẽ biểu đồ số học sinh có rủi ro Cao & Cảnh báo theo từng lớp học."""
+    # Lọc học sinh có nguy cơ
+    at_risk_df = df[df["risk_level"].isin(["🔴 Cao", "🟠 Cảnh báo"])].copy()
+    
+    if at_risk_df.empty:
+        # Trả về một figure trống nếu không có học sinh nguy cơ
+        fig = go.Figure()
+        fig.update_layout(
+            title="Số học sinh có nguy cơ (🔴 Cao & 🟠 Cảnh báo) theo lớp",
+            xaxis=dict(title="Lớp học"),
+            yaxis=dict(title="Số học sinh"),
+            height=400,
+            template="plotly_white",
+            annotations=[dict(text="Không có học sinh nguy cơ", showarrow=False, font=dict(size=16))]
+        )
+        return fig
+
+    # Nếu thiếu cột class_name (khi upload file chỉ có đặc trưng học thuật), tạo cột giả để tránh crash
+    if "class_name" not in at_risk_df.columns:
+        at_risk_df["class_name"] = "Chung (Không chia lớp)"
+        
+    # Group by class và risk_level
+    grouped = at_risk_df.groupby(["class_name", "risk_level"]).size().reset_index(name="count")
+
+    
+    fig = px.bar(
+        grouped,
+        x="class_name",
+        y="count",
+        color="risk_level",
+        color_discrete_map={
+            "🔴 Cao": "#EF4444",
+            "🟠 Cảnh báo": "#F59E0B",
+        },
+        title="Số học sinh có nguy cơ (🔴 Cao & 🟠 Cảnh báo) theo lớp",
+        labels={"class_name": "Lớp học", "count": "Số lượng học sinh", "risk_level": "Mức độ nguy cơ"},
+        category_orders={"risk_level": ["🔴 Cao", "🟠 Cảnh báo"]},
+    )
+    
+    fig.update_layout(
+        template="plotly_white",
+        height=400,
+        barmode="stack",
+        xaxis={'categoryorder':'category ascending'}
+    )
+    
+    return fig
+

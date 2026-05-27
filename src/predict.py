@@ -186,4 +186,9 @@ def predict_batch(
     result_df["final_prediction"] = final_preds
     result_df["confidence"] = confidences
 
+    # Tích hợp Early Warning System phân tích chỉ số rủi ro
+    from src.early_warning import analyze_batch_ews
+    result_df = analyze_batch_ews(result_df)
+
     return result_df
+

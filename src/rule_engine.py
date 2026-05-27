@@ -10,25 +10,30 @@ Module này implement:
 Công thức theo quy định Bộ GD&ĐT Việt Nam.
 """
 
+import math
 from typing import Optional
 
 
 def calculate_dtb_mhk(
     regular_scores: list[float],
     midterm_score: float,
-    final_score: float,
+    final_score: Optional[float] = None,
 ) -> float:
     """
     Tính Điểm Trung Bình Môn Học Kỳ (DTB_mhk).
 
-    Công thức:
+    Công thức đầy đủ:
         DTB_mhk = (sum(regular_scores) + 2 × midterm_score + 3 × final_score)
                   / (số_điểm_thường_xuyên + 5)
+
+    Công thức giữa kỳ (nếu chưa có final_score):
+        DTB_mhk_gk = (sum(regular_scores) + 2 × midterm_score)
+                     / (số_điểm_thường_xuyên + 2)
 
     Args:
         regular_scores: Danh sách điểm đánh giá thường xuyên.
         midterm_score: Điểm giữa kỳ.
-        final_score: Điểm cuối kỳ.
+        final_score: Điểm cuối kỳ (tùy chọn).
 
     Returns:
         Điểm trung bình môn học kỳ, làm tròn 1 chữ số thập phân.
@@ -39,15 +44,27 @@ def calculate_dtb_mhk(
     if not regular_scores:
         raise ValueError("regular_scores phải có ít nhất 1 điểm.")
 
-    # Validate ranges
-    all_scores = regular_scores + [midterm_score, final_score]
+    # Validate ranges for available scores
+    all_scores = list(regular_scores) + [midterm_score]
+    
+    # Check if final_score is provided and is not NaN
+    has_final = final_score is not None and not (isinstance(final_score, float) and math.isnan(final_score))
+    if has_final:
+        all_scores.append(final_score)
+
     for score in all_scores:
         if not (0.0 <= score <= 10.0):
             raise ValueError(f"Điểm phải trong khoảng [0, 10]. Nhận được: {score}")
 
     n = len(regular_scores)
-    numerator = sum(regular_scores) + 2 * midterm_score + 3 * final_score
-    denominator = n + 5
+    if has_final:
+        numerator = sum(regular_scores) + 2 * midterm_score + 3 * final_score
+        denominator = n + 5
+    else:
+        # Công thức tính điểm giữa kỳ: regular hệ số 1, midterm hệ số 2
+        numerator = sum(regular_scores) + 2 * midterm_score
+        denominator = n + 2
+        
     return round(numerator / denominator, 1)
 
 

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cẩm nang Học thuật & Kỹ thuật toàn diện - EWS</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- MathJax for rendering equations -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <style>
+        :root {
+            --primary: #1E3A8A;
+            --primary-light: #3B82F6;
+            --secondary: #0F172A;
+            --text-main: #334155;
+            --text-dark: #0F172A;
+            --bg-light: #F8FAFC;
+            --border: #E2E8F0;
+            --red: #EF4444;
+            --orange: #F59E0B;
+            --green: #10B981;
+            --blue: #3B82F6;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
+            background-color: var(--bg-light);
+            line-height: 1.6;
+            font-size: 15px;
+            padding: 40px 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 50px 60px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+            border: 1px solid var(--border);
+        }
+        
+        /* Header styling */
+        header {
+            text-align: center;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .logo {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+        
+        h1 {
+            color: var(--primary);
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            line-height: 1.2;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            color: #64748B;
+            font-weight: 500;
+        }
+        
+        /* Typography */
+        h2 {
+            color: var(--primary);
+            font-size: 1.5rem;
+            font-weight: 700;
+            border-left: 5px solid var(--primary-light);
+            padding-left: 15px;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            letter-spacing: -0.3px;
+        }
+        
+        h3 {
+            color: var(--secondary);
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-top: 25px;
+            margin-bottom: 12px;
+        }
+        
+        p {
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+        
+        ul, ol {
+            margin-bottom: 20px;
+            padding-left: 25px;
+        }
+        
+        li {
+            margin-bottom: 8px;
+        }
+        
+        /* Alerts */
+        .alert-box {
+            background-color: #EFF6FF;
+            border-left: 4px solid var(--primary-light);
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-size: 0.95rem;
+        }
+        
+        .alert-box strong {
+            color: var(--primary);
+        }
+        
+        /* Math display */
+        .math-display {
+            background-color: var(--bg-light);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin: 20px 0;
+            overflow-x: auto;
+            text-align: center;
+        }
+        
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+            font-size: 0.95rem;
+        }
+        
+        th, td {
+            border: 1px solid var(--border);
+            padding: 12px 15px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            font-weight: 600;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #FAFAFA;
+        }
+        
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: #fff;
+        }
+        
+        .badge-red { background-color: var(--red); }
+        .badge-orange { background-color: var(--orange); }
+        .badge-yellow { background-color: #EAB308; }
+        .badge-green { background-color: var(--green); }
+        
+        /* Print instructions */
+        .print-btn-container {
+            text-align: center;
+            margin-top: 30px;
+            margin-bottom: 20px;
+        }
+        
+        .print-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 10px rgba(30, 58, 138, 0.2);
+        }
+        
+        .print-btn:hover {
+            background-color: var(--primary-light);
+            transform: translateY(-2px);
+        }
+        
+        @media print {
+            body {
+                background-color: #fff;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+                border: none;
+                padding: 0;
+                max-width: 100%;
+            }
+            .print-btn-container {
+                display: none;
+            }
+            h2 {
+                page-break-before: always;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="print-btn-container">
+        <button class="print-btn" onclick="window.print()">📥 Bấm vào đây để lưu thành file PDF</button>
+        <p style="text-align: center; margin-top: 10px; font-size: 0.85rem; color: #64748B;">
+            (Hoặc nhấn Tổ hợp phím <b>Ctrl + P</b> trong trình duyệt, chọn <b>"Save as PDF / Lưu thành PDF"</b>)
+        </p>
+    </div>
+
+    <div class="container">
+        <header>
+            <div class="logo">🎓</div>
+            <h1>CẨM NANG HỌC THUẬT & KỸ THUẬT TOÀN DIỆN</h1>
+            <p class="subtitle">Smart Student Classifier & Early Warning System (EWS)</p>
+        </header>
+
+        <h2>🏛️ PHẦN I: CƠ SỞ PHÁP LÝ & PEDAGOGICAL FOUNDATIONS</h2>
+        <p>Hệ thống được thiết kế bám sát <strong>Thông tư 22/2021/TT-BGDĐT</strong> của Bộ Giáo dục & Đào tạo Việt Nam ban hành ngày 20/07/2021 quy định về đánh giá học sinh trung học cơ sở và trung học phổ thông.</p>
+        
+        <h3>1. Phân chia môn học & Phương thức đánh giá</h3>
+        <p>Hệ thống giả lập cơ cấu chương trình THCS/THPT tiêu chuẩn:</p>
+        <ul>
+            <li><strong>8 Môn đánh giá bằng nhận xét kết hợp điểm số (num_score_subjects = 8)</strong>: <em>Toán, Ngữ văn, Ngoại ngữ, Khoa học tự nhiên, Lịch sử và Địa lí, Tin học, Công nghệ, Giáo dục công dân</em>.</li>
+            <li><strong>3 Môn chỉ đánh giá bằng nhận xét (num_comment_subjects = 3)</strong>: <em>Giáo dục thể chất, Nghệ thuật, Hoạt động trải nghiệm hướng nghiệp</em>. Kết quả chỉ ghi nhận là <strong>"Đạt" (Pass)</strong> hoặc <strong>"Chưa đạt" (Fail)</strong>.</li>
+        </ul>
+
+        <h3>2. Tiêu chuẩn xếp loại học lực cứng theo Thông tư 22</h3>
+        <p>Rule Engine áp dụng chính xác các luật phân hạng sau (theo thứ tự ưu tiên giảm dần):</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Học lực</th>
+                    <th>Điều kiện nhận xét</th>
+                    <th>Điều kiện ĐTB (GPA) các môn điểm số</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>🟢 Tốt</strong></td>
+                    <td>Tất cả môn nhận xét đều <strong>Đạt</strong></td>
+                    <td>Tất cả các môn ĐTB $\ge 6.5$, có ít nhất <strong>6 môn</strong> ĐTB $\ge 8.0$</td>
+                </tr>
+                <tr>
+                    <td><strong>🔵 Khá</strong></td>
+                    <td>Tất cả môn nhận xét đều <strong>Đạt</strong></td>
+                    <td>Tất cả các môn ĐTB $\ge 5.0$, có ít nhất <strong>6 môn</strong> ĐTB $\ge 6.5$</td>
+                </tr>
+                <tr>
+                    <td><strong>🟡 Đạt</strong></td>
+                    <td>Có tối đa <strong>1 môn</strong> nhận xét <strong>Chưa đạt</strong></td>
+                    <td>Có ít nhất <strong>6 môn</strong> ĐTB $\ge 5.0$, không môn nào dưới 3.5</td>
+                </tr>
+                <tr>
+                    <td><strong>🔴 Chưa đạt</strong></td>
+                    <td colspan="2">Các trường hợp còn lại (Điểm trung bình yếu hoặc dính điều kiện loại trừ).</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>🚨 PHẦN II: KIẾN TRÚC TOÁN HỌC CỦA HỆ THỐNG CẢNH BÁO SỚM (EWS)</h2>
+        <p>Điểm cốt lõi vượt trội của sản phẩm là khả năng chuyển dịch từ <strong>"Đánh giá kết quả cuối kỳ bị động"</strong> sang <strong>"Chủ động dự báo và can thiệp sớm học đường"</strong> nhờ chỉ số Điểm rủi ro (Risk Score) từ 0 - 100 điểm.</p>
+
+        <h3>1. Phương trình toán học tính Điểm rủi ro</h3>
+        <p>Hệ thống tự động tính toán điểm rủi ro tổng hợp cho học sinh bằng cách tích hợp cả chỉ số điểm số học thuật và hành vi sư phạm:</p>
+        
+        <div class="math-display">
+            $$\text{Điểm rủi ro} = 0.30 \times R_{\text{chuyên cần}} + 0.25 \times R_{\text{điểm liệt}} + 0.15 \times R_{\text{nhận xét}} + 0.15 \times R_{\text{GPA}} + 0.10 \times R_{\text{bài tập}} + 0.05 \times R_{\text{tiến bộ}}$$
+        </div>
+
+        <p>Chi tiết các cấu phần rủi ro được chuẩn hóa về thang điểm 100:</p>
+        <ul>
+            <li><strong>Rủi ro chuyên cần ($R_{\text{chuyên cần}}$) - Trọng số 30%</strong>: 
+                <ul>
+                    <li>Nếu chuyên cần $< 75\%$ (vắng quá 45 buổi học theo Điều 12 TT22) $\rightarrow R_{\text{chuyên cần}} = 100$.</li>
+                    <li>Nếu chuyên cần $< 85\% \rightarrow R_{\text{chuyên cần}} = 60 + (85 - \text{chuyên cần}) \times 4$.</li>
+                    <li>Ngược lại: $R_{\text{chuyên cần}} = (100 - \text{chuyên cần}) \times 4$.</li>
+                </ul>
+            </li>
+            <li><strong>Rủi ro điểm liệt ($R_{\text{điểm liệt}}$) - Trọng số 25%</strong>:
+                <ul>
+                    <li>Nếu môn học thấp nhất $< 3.5$ (dính điểm liệt) $\rightarrow R_{\text{điểm liệt}} = 100$.</li>
+                    <li>Nếu môn thấp nhất $< 5.0 \rightarrow R_{\text{điểm liệt}} = 50 + (5.0 - \text{môn thấp nhất}) \times 33.3$.</li>
+                    <li>Ngược lại: $R_{\text{điểm liệt}} = 0$.</li>
+                </ul>
+            </li>
+            <li><strong>Rủi ro môn nhận xét ($R_{\text{nhận xét}}$) - Trọng số 15%</strong>:
+                <ul>
+                    <li>Nếu có $\ge 2$ môn nhận xét "Chưa đạt" (bắt buộc Chưa đạt theo luật) $\rightarrow R_{\text{nhận xét}} = 100$.</li>
+                    <li>Nếu có 1 môn "Chưa đạt" $\rightarrow R_{\text{nhận xét}} = 50$.</li>
+                    <li>Ngược lại: $R_{\text{nhận xét}} = 0$.</li>
+                </ul>
+            </li>
+            <li><strong>Rủi ro học lực ĐTB chung ($R_{\text{GPA}}$) - Trọng số 15%</strong>:
+                <ul>
+                    <li>Nếu ĐTB chung $< 5.0$ hoặc số môn $\ge 5.0$ dưới 6 môn $\rightarrow R_{\text{GPA}} = 100$.</li>
+                    <li>Nếu ĐTB chung $< 6.5 \rightarrow R_{\text{GPA}} = 50 + (6.5 - \text{ĐTB chung}) \times 33.3$.</li>
+                    <li>Ngược lại: $R_{\text{GPA}} = 0$.</li>
+                </ul>
+            </li>
+            <li><strong>Rủi ro nộp bài tập ($R_{\text{bài tập}}$) - Trọng số 10%</strong>:
+                <ul>
+                    <li>Nếu tỷ lệ bài tập nộp $< 60\% \rightarrow R_{\text{bài tập}} = 100$.</li>
+                    <li>Nếu tỷ lệ $< 80\% \rightarrow R_{\text{bài tập}} = 50 + (80 - \text{tỷ lệ}) \times 2.5$.</li>
+                    <li>Ngược lại: $R_{\text{bài tập}} = (100 - \text{tỷ lệ}) \times 2.5$.</li>
+                </ul>
+            </li>
+            <li><strong>Rủi ro sa sút học lực ($R_{\text{tiến bộ}}$) - Trọng số 5%</strong>:
+                <ul>
+                    <li>Nếu ĐTB sụt giảm mạnh so với học kỳ trước ($\text{delta} \le -2.0$) $\rightarrow R_{\text{tiến bộ}} = 100$.</li>
+                    <li>Nếu sụt giảm nhẹ ($\text{delta} < 0$) $\rightarrow R_{\text{tiến bộ}} = -\text{delta} \times 50$.</li>
+                    <li>Ngược lại: $R_{\text{tiến bộ}} = 0$.</li>
+                </ul>
+            </li>
+        </ul>
+
+        <h3>2. Luật tự động kích hoạt Cảnh báo đỏ (🔴 Cao)</h3>
+        <p>Hệ thống áp dụng các luật loại trừ bắt buộc của Bộ GD&ĐT. Học sinh sẽ lập tức bị xếp vào nhóm <strong>🔴 Nguy cơ Cao (Cần can thiệp khẩn cấp)</strong> bất kể điểm số tổng hợp là bao nhiêu nếu vi phạm một trong các điều sau:</p>
+        <ol>
+            <li><strong>Nghỉ học quá quy định</strong>: Chuyên cần lũy kế thực tế < 75%.</li>
+            <li><strong>Dính điểm liệt học thuật</strong>: Điểm trung bình môn thành phần dưới 3.5.</li>
+            <li><strong>Yếu môn nhận xét</strong>: Có $\ge 2$ môn nhận xét ở trạng thái "Chưa đạt".</li>
+            <li><strong>Yếu kém GPA</strong>: ĐTB chung < 5.0 hoặc số môn học đạt từ 5.0 trở lên ít hơn 6 môn.</li>
+        </ol>
+
+        <h2>🤖 PHẦN III: THIẾT KẾ KỸ THUẬT & MACHINE LEARNING</h2>
+
+        <h3>1. Trích xuất đặc trưng sư phạm (Feature Engineering)</h3>
+        <p>Hệ thống chuyển đổi các quan sát định tính (nhận xét, thái độ) thành dữ liệu số (định lượng) qua Rubrics:</p>
+        <ul>
+            <li><strong>Điểm tham gia xây dựng bài (`participation_score` 1-10)</strong>: Tần suất phát biểu tích cực, đóng góp ý kiến thảo luận nhóm.</li>
+            <li><strong>Điểm nề nếp hành vi (`behavior_score` 1-10)</strong>: Dựa trên vi phạm nề nếp trong Sổ đầu bài.</li>
+            <li><strong>Độ lệch chuẩn điểm số (`std_score` - Học lệch)</strong>: Đo lường mức độ học lệch giữa các môn. Biến số này giúp AI phát hiện học sinh học lệch sâu (ví dụ: Toán 10 nhưng Văn 3.5) có nguy cơ cực kỳ cao bị xếp loại Chưa đạt do luật điểm liệt.</li>
+            <li><strong>Mức tiến bộ học lực (`progress_delta`)</strong>: Hiệu số GPA kỳ hiện tại trừ kỳ trước để phân tích xu hướng biến động.</li>
+        </ul>
+
+        <h3>2. Các mô hình Machine Learning được sử dụng</h3>
+        <ul>
+            <li><strong>Decision Tree (Cây quyết định)</strong>: Cực kỳ dễ trực quan hóa và giải thích. Thích hợp để minh họa cơ chế rẽ nhánh câu hỏi "Đặc trưng X $\le$ ngưỡng?" trước hội đồng.</li>
+            <li><strong>Random Forest (Rừng ngẫu nhiên - 100 cây)</strong>: Mô hình chính của hệ thống. Độ ổn định rất cao, chống overfit xuất sắc trên dữ liệu dạng bảng (tabular data), cung cấp chỉ số <strong>Feature Importance</strong> (Tầm quan trọng đặc trưng) để giải thích cơ chế ra quyết định của AI.</li>
+        </ul>
+
+        <h2>📅 PHẦN IV: CÁCH HỆ THỐNG XỬ LÝ KHÁC BIỆT KỲ HỌC</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Đặc trưng</th>
+                    <th>📅 1. Giữa kỳ (Mid-Semester)</th>
+                    <th>📝 2. Cuối kỳ (End-of-Semester)</th>
+                    <th>🏫 3. Cả năm (Full-Year)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Trạng thái dữ liệu</strong></td>
+                    <td><strong>Khuyết điểm cuối kỳ</strong> (final_score là NaN).</td>
+                    <td><strong>Dữ liệu đầy đủ</strong> của 1 học kỳ.</td>
+                    <td><strong>Dữ liệu tích hợp</strong> cả 2 học kỳ.</td>
+                </tr>
+                <tr>
+                    <td><strong>Số môn tổng hợp</strong></td>
+                    <td>Đúng <strong>8 môn điểm số, 3 môn nhận xét</strong> của học kỳ hiện tại.</td>
+                    <td>Đúng <strong>8 môn điểm số, 3 môn nhận xét</strong> của học kỳ hiện tại.</td>
+                    <td>Tổng hợp cả năm (HK2 nhân hệ số 2).</td>
+                </tr>
+                <tr>
+                    <td><strong>Tính chất chuyên cần</strong></td>
+                    <td>Tính tỷ lệ lũy kế trên <strong>số buổi thực tế đã học</strong>. Không bị sai lệch dữ liệu.</td>
+                    <td>Tính tỷ lệ trên tổng số buổi của cả kỳ học.</td>
+                    <td>Tính tỷ lệ lũy kế đến hết năm học.</td>
+                </tr>
+                <tr>
+                    <td><strong>Vai trò của AI</strong></td>
+                    <td><span class="badge badge-red">DỰ BÁO SỚM & CẢNH BÁO</span></td>
+                    <td><span class="badge badge-blue">ĐÁNH GIÁ KẾT QUẢ</span></td>
+                    <td><span class="badge badge-green">QUYẾT ĐỊNH HỌC THUẬT</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>🏫 PHẦN V: KỊCH BẢN THUYẾT TRÌNH BẢO VỆ ĐỀ TÀI ĐẮT GIÁ</h2>
+        
+        <div class="alert-box">
+            <strong>💡 Chiến lược thuyết trình thuyết phục Thầy Cô:</strong><br><br>
+            <em>"Kính thưa Hội đồng chấm phản biện, điểm đột phá thực sự của đề tài chúng em là <strong>Chủ động hóa công tác can thiệp học đường (EWS)</strong>.<br><br>
+            Hiện nay, tất cả các ứng dụng quản lý điểm truyền thống đều có nhược điểm chí mạng là <strong>BỊ ĐỘNG</strong>. Giáo viên và phụ huynh chỉ biết kết quả xếp loại khi kỳ thi cuối kỳ đã kết thúc, điểm số đã vào sổ học bạ - lúc đó đã quá muộn để giúp đỡ học sinh.<br><br>
+            Hệ thống của chúng em giải quyết triệt để vấn đề này. Tại <strong>Tab 2</strong>, em giả lập thời điểm <strong>Giữa học kỳ 2</strong> cho <strong>2,000 học sinh</strong>. Điểm thi cuối kỳ hoàn toàn trống (NaN) và số buổi học lũy kế được số hóa chính xác dựa trên số buổi thực tế đã diễn ra tính đến thời điểm hiện tại.<br><br>
+            Khi chạy <strong>Tab 6 (Cảnh báo sớm)</strong>, mô hình AI của chúng em đã học từ dữ liệu lịch sử để dự báo trước nhãn xếp loại cuối học kỳ của học sinh dựa trên các dữ liệu hành vi như Chuyên cần lũy kế, Tỷ lệ hoàn thành bài tập và GPA giữa kỳ.<br><br>
+            Như thầy cô có thể nhìn thấy trên Dashboard, hệ thống lập tức phát hiện các học sinh ở nhóm <strong>Nguy cơ Cao (🔴)</strong>. Cụ thể em HS001 lớp 6A1 đang có điểm rủi ro là 96.2/100, hệ thống chỉ rõ cờ cảnh báo Chuyên cần 72% vi phạm Điều 12 Thông tư 22 (vắng quá 45 buổi học). Đồng thời hệ thống xuất ngay báo cáo can thiệp gửi về cho GVCN lớp 6A1 kèm kế hoạch sư phạm can thiệp khẩn cấp.<br><br>
+            Đây chính là triết lý sư phạm nhân văn và hiện đại nhất của công nghệ EdTech: <strong>Chủ động phát hiện sớm để không học sinh nào bị bỏ lại phía sau</strong>!"</em>
+        </div>
+
+    </div>
+
+</body>
+</html>

@@ -34,11 +34,13 @@ from src.evaluation import compare_models, get_feature_importance_df
 from src.explanations import (
     generate_ml_explanation, explain_feature_importance,
     explain_decision_tree_summary, explain_rule_engine_logic, FEATURE_NAMES_VI,
+    explain_qualitative_metrics,
 )
 from src.recommendations import generate_recommendations, get_risk_level
 from src.visualization import (
     plot_label_distribution, plot_label_pie, plot_confusion_matrix,
     plot_feature_importance, plot_metrics_comparison, plot_score_distribution,
+    plot_risk_level_distribution, plot_risk_by_class,
 )
 from src.utils import get_label_emoji, get_label_color
 
@@ -122,10 +124,11 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "📐 Tính điểm & Rule Engine",
     "🤖 Huấn luyện mô hình",
     "👤 Dự đoán một học sinh",
-    "📋 Dự đoán hàng loạt",
+    "🚨 Cảnh báo sớm & Dự đoán hàng loạt",
     "🔍 Giải thích mô hình",
     "📚 Phương pháp & giới hạn",
 ])
+
 
 # ============================================================
 # TAB 1: TỔNG QUAN
@@ -273,14 +276,40 @@ with tab2:
 
     with col_gen:
         st.subheader("🔄 Tạo dataset mẫu")
-        num_students = st.number_input("Số lượng học sinh", min_value=100, max_value=1000, value=1000, step=50)
+        num_students = st.number_input("Số lượng học sinh", min_value=100, max_value=2000, value=1000, step=50)
+        
+        profile_options = {
+            "balanced": "📊 Đều & Cân bằng (Chuẩn thực tế)",
+            "high_performing": "🟢 Thiên về Học tốt (High Performing)",
+            "at_risk": "🔴 Thiên về Nguy cơ / Chưa đạt (At Risk)",
+            "mid_semester": "📅 Dữ liệu Giữa kỳ (Chưa có điểm cuối kỳ)"
+        }
+        
+        profile_choice = st.selectbox(
+            "Kiểu dữ liệu sinh mẫu",
+            options=list(profile_options.keys()),
+            format_func=lambda x: profile_options[x],
+            help="Chọn cấu trúc phân bổ và mức độ học lực của tệp học sinh giả lập."
+        )
+        
+        # Mô tả chi tiết kiểu dữ liệu
+        if profile_choice == "balanced":
+            st.info("💡 **Phân bổ cân bằng**: Phân phối nhãn chuẩn học sinh thực tế (~20% Tốt, ~28% Khá, ~26% Đạt, ~16% Chưa đạt, ~10% Nghịch cảnh).")
+        elif profile_choice == "high_performing":
+            st.success("💡 **Học sinh xuất sắc**: Đa số học sinh đạt kết quả tốt/khá (~85%), học sinh yếu kém cực kỳ ít (~3%). Phù hợp mô phỏng lớp chọn.")
+        elif profile_choice == "at_risk":
+            st.warning("💡 **Nguy cơ cao**: Tỷ lệ học sinh yếu kém, Chưa đạt chiếm tỷ trọng lớn (~50%). Đây là tệp dữ liệu hoàn hảo để kiểm nghiệm bộ lọc Cảnh báo sớm (EWS).")
+        elif profile_choice == "mid_semester":
+            st.error("💡 **Dữ liệu Giữa kỳ**: Điểm thi cuối kỳ trống (NaN). Điểm học kỳ được tính tạm thời theo điểm số giữa kỳ. Thích hợp cho kịch bản mô phỏng cảnh báo sớm trước kỳ thi.")
+
         if st.button("🚀 Tạo dataset mẫu", type="primary", use_container_width=True):
             with st.spinner("Đang tạo dữ liệu mô phỏng..."):
                 profiles, scores, comments, features = generate_all_data(
-                    num_students=num_students, random_state=42
+                    num_students=num_students, random_state=42, data_profile=profile_choice
                 )
-            st.success(f"✅ Đã tạo dataset cho {num_students} học sinh!")
+            st.success(f"✅ Đã tạo dataset cho {num_students} học sinh ({profile_options[profile_choice]})!")
             st.rerun()
+
 
     with col_upload:
         st.subheader("📤 Upload CSV")
@@ -692,103 +721,291 @@ with tab5:
                     st.error(f"❌ Lỗi: {e}")
 
 # ============================================================
-# TAB 6: DỰ ĐOÁN HÀNG LOẠT
+# TAB 6: CẢNH BÁO SỚM & DỰ ĐOÁN HÀNG LOẠT
 # ============================================================
 
 with tab6:
-    st.header("📋 Dự đoán hàng loạt")
+    st.header("🚨 Cảnh báo sớm & Dự đoán hàng loạt (Early Warning System)")
 
     if not MODELS_DIR.joinpath("decision_tree.pkl").exists():
-        st.warning("⚠️ Chưa có mô hình. Hãy huấn luyện trước.")
+        st.warning("⚠️ Chưa có mô hình. Hãy huấn luyện trước ở tab **Huấn luyện mô hình**.")
     else:
-        st.subheader("📤 Upload CSV dữ liệu")
-        st.info(f"File CSV phải chứa các cột: {', '.join(FEATURE_COLUMNS[:5])}... (tổng {len(FEATURE_COLUMNS)} cột)")
+        # Lựa chọn nguồn dữ liệu
+        st.subheader("🔍 Lựa chọn nguồn dữ liệu")
+        source_mode = st.radio(
+            "Chọn nguồn dữ liệu để chạy phân tích:",
+            ["📁 Sử dụng dữ liệu hiện tại trong hệ thống (student_features.csv)", "📤 Tải lên file dữ liệu mới (CSV hoặc Excel)"],
+            horizontal=True
+        )
 
-        # Download mẫu
-        features_df = load_features_if_exists()
-        if features_df is not None:
-            sample = features_df[FEATURE_COLUMNS].head(5)
-            col_sdown1, col_sdown2 = st.columns(2)
-            with col_sdown1:
-                st.download_button(
-                    "📥 Tải file CSV mẫu",
-                    sample.to_csv(index=False, encoding="utf-8-sig"),
-                    "sample_batch_input.csv", "text/csv",
-                    use_container_width=True,
-                )
-            with col_sdown2:
-                try:
-                    excel_sample = to_excel(sample)
+        batch_df = None
+
+        if "Sử dụng dữ liệu hiện tại" in source_mode:
+            features_df = load_features_if_exists()
+            if features_df is None:
+                st.warning("⚠️ Hệ thống chưa có dữ liệu mẫu. Vui lòng sang tab **Dữ liệu** để tạo dataset trước.")
+            else:
+                batch_df = features_df.copy()
+                st.info(f"📋 Tìm thấy dữ liệu sẵn có gồm **{len(batch_df)}** học sinh. Sẵn sàng để phân tích cảnh báo sớm!")
+
+                # Nút bấm chạy EWS trên dữ liệu có sẵn
+                if st.button("🔮 Chạy phân tích Cảnh báo sớm (EWS)", type="primary", use_container_width=True):
+                    with st.spinner("Đang chạy mô hình AI và tính toán rủi ro..."):
+                        # Chạy dự đoán batch (đã tích hợp EWS trong predict_batch)
+                        result_df = predict_batch(batch_df)
+                        st.session_state["ews_result_df"] = result_df
+                        st.success(f"✅ Đã chạy phân tích thành công cho {len(result_df)} học sinh!")
+
+        else:  # Tải lên file mới
+            st.info(f"File CSV/Excel tải lên phải chứa đầy đủ 15 cột đặc trưng: {', '.join(FEATURE_COLUMNS[:4])}...")
+
+            # Tải mẫu
+            features_df = load_features_if_exists()
+            if features_df is not None:
+                sample = features_df[FEATURE_COLUMNS].head(5)
+                col_sdown1, col_sdown2 = st.columns(2)
+                with col_sdown1:
                     st.download_button(
-                        "📥 Tải file Excel mẫu (.xlsx)",
-                        excel_sample, "sample_batch_input.xlsx",
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "📥 Tải file CSV mẫu",
+                        sample.to_csv(index=False, encoding="utf-8-sig"),
+                        "sample_batch_input.csv", "text/csv",
                         use_container_width=True,
                     )
+                with col_sdown2:
+                    try:
+                        excel_sample = to_excel(sample)
+                        st.download_button(
+                            "📥 Tải file Excel mẫu (.xlsx)",
+                            excel_sample, "sample_batch_input.xlsx",
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True,
+                        )
+                    except Exception as e:
+                        st.error(f"Lỗi xuất Excel mẫu: {e}")
+
+            batch_file = st.file_uploader("Upload file CSV hoặc Excel", type=["csv", "xlsx"], key="batch_upload")
+
+            if batch_file is not None:
+                try:
+                    if batch_file.name.endswith(".xlsx"):
+                        batch_df = pd.read_excel(batch_file)
+                    else:
+                        batch_df = pd.read_csv(batch_file, encoding="utf-8-sig")
+                    st.write(f"📊 Đã tải **{len(batch_df)}** dòng dữ liệu từ file.")
+
+                    # Validate
+                    missing_cols = [col for col in FEATURE_COLUMNS if col not in batch_df.columns]
+                    if missing_cols:
+                        st.error(f"❌ File thiếu cột đặc trưng: {missing_cols}")
+                    else:
+                        if st.button("🔮 Chạy dự đoán & Phân tích rủi ro EWS", type="primary", use_container_width=True):
+                            with st.spinner("Đang chạy mô hình AI và phân tích rủi ro..."):
+                                result_df = predict_batch(batch_df)
+                                st.session_state["ews_result_df"] = result_df
+                                st.success(f"✅ Dự đoán thành công cho {len(result_df)} học sinh!")
                 except Exception as e:
-                    st.error(f"Lỗi xuất Excel: {e}")
+                    st.error(f"Lỗi đọc file: {e}")
 
-        batch_file = st.file_uploader("Upload file CSV hoặc Excel", type=["csv", "xlsx"], key="batch_upload")
+        # HIỂN THỊ KẾT QUẢ TỪ SESSION STATE (TRÁNH BỊ MẤT KHI RERUN)
+        if "ews_result_df" in st.session_state:
+            result_df = st.session_state["ews_result_df"]
 
-        if batch_file is not None:
-            try:
-                if batch_file.name.endswith(".xlsx"):
-                    batch_df = pd.read_excel(batch_file)
-                else:
-                    batch_df = pd.read_csv(batch_file, encoding="utf-8-sig")
-                st.write(f"📊 Đã tải {len(batch_df)} dòng dữ liệu")
+            st.markdown("---")
+            st.subheader("🚨 BẢNG ĐIỀU KHIỂN CẢNH BÁO SỚM HỌC ĐƯỜNG (EWS DASHBOARD)")
 
-                # Validate
-                missing_cols = [col for col in FEATURE_COLUMNS if col not in batch_df.columns]
-                if missing_cols:
-                    st.error(f"❌ Thiếu cột: {missing_cols}")
-                else:
-                    if st.button("🔮 Dự đoán hàng loạt", type="primary", use_container_width=True):
-                        with st.spinner("Đang dự đoán..."):
-                            result_df = predict_batch(batch_df)
+            # --- Hướng dẫn cơ chế EWS ---
+            with st.expander("📚 HƯỚNG DẪN: Cơ chế tính Điểm rủi ro & Phân cấp Nguy cơ (EWS)", expanded=False):
+                st.markdown(r"""
+                ### 📐 Cơ chế toán học & Nghiệp vụ Sư phạm của EWS
 
-                        st.success(f"✅ Đã dự đoán {len(result_df)} học sinh!")
+                Điểm rủi ro (**Risk Score** từ 0 đến 100) được tính toán tự động bằng cách kết hợp toán học các yếu tố học thuật và hành vi, bám sát các điều kiện loại trừ quy định bởi **Thông tư 22/2021/TT-BGDĐT** của Bộ Giáo dục & Đào tạo Việt Nam:
 
-                        # Hiển thị kết quả
-                        display_cols = ["student_id"] if "student_id" in result_df.columns else []
-                        display_cols += ["final_prediction", "confidence", "dt_prediction", "rf_prediction"]
-                        display_cols += [col for col in FEATURE_COLUMNS[:5] if col in result_df.columns]
+                $$\text{Điểm rủi ro} = 0.30 \times R_{\text{chuyên cần}} + 0.25 \times R_{\text{điểm liệt}} + 0.15 \times R_{\text{nhận xét}} + 0.15 \times R_{\text{GPA}} + 0.10 \times R_{\text{bài tập}} + 0.05 \times R_{\text{tiến bộ}}$$
 
-                        st.dataframe(result_df[display_cols], use_container_width=True, hide_index=True)
+                #### 🔴 Cơ chế Tự động kích hoạt "Nguy cơ Cao" (🔴 Cao)
+                Hệ thống áp dụng các **luật loại trừ bắt buộc của Bộ GD&ĐT**. Học sinh sẽ lập tức bị xếp vào nhóm **🔴 Nguy cơ Cao (Cần can thiệp khẩn cấp)** bất kể điểm số tổng hợp là bao nhiêu nếu vi phạm một trong các điều sau:
+                1.  **Chuyên cần dưới 75%**: Nguy cơ lưu ban trực tiếp do nghỉ học quá 45 buổi học quy định bởi *Điều 12 Thông tư 22*.
+                2.  **Có điểm liệt môn học dưới 3.5**: Bắt buộc xếp loại *Chưa đạt* học kỳ/cả năm.
+                3.  **Có từ 2 môn nhận xét "Chưa đạt" trở lên**: Bắt buộc xếp loại *Chưa đạt*.
+                4.  **GPA yếu kém dưới 5.0 hoặc số môn học đạt từ 5.0 trở lên ít hơn 6 môn**: Không đủ tiêu chuẩn xếp loại đạt.
 
-                        # Thống kê
-                        st.subheader("📊 Phân bố kết quả")
-                        pred_counts = result_df["final_prediction"].value_counts()
-                        pred_cols = st.columns(4)
-                        for i, label in enumerate(CLASS_LABELS):
-                            count = pred_counts.get(label, 0)
-                            pred_cols[i].metric(f"{get_label_emoji(label)} {label}", count)
+                #### 📊 Phân cấp mức độ rủi ro hệ thống
+                *   🔴 **Nguy cơ Cao (Critical)**: Điểm rủi ro $\ge 75$ hoặc dính bất kỳ vi phạm tự động nào ở trên. *Hành động: Kích hoạt kế hoạch can thiệp học đường khẩn cấp.*
+                *   🟠 **Cần hỗ trợ (Warning)**: Điểm rủi ro từ $45$ đến $74$. *Hành động: Giáo viên chủ nhiệm gặp gỡ, trao đổi sát sao và lên phương án kèm cặp.*
+                *   🟡 **Cần theo dõi (Monitor)**: Điểm rủi ro từ $25$ đến $44$. *Hành động: Theo dõi tiến trình làm bài tập và nhắc nhở trên lớp.*
+                *   🟢 **An toàn (Safe)**: Điểm rủi ro dưới $25$. *Hành động: Khuyến khích tiếp tục phát huy và hỗ trợ các bạn cùng lớp.*
+                """)
 
-                        # Download kết quả
-                        csv_result = result_df.to_csv(index=False, encoding="utf-8-sig")
-                        result_df.to_csv(BATCH_PREDICTIONS_FILE, index=False, encoding="utf-8-sig")
-                        
-                        col_bdown1, col_bdown2 = st.columns(2)
-                        with col_bdown1:
-                            st.download_button(
-                                "📥 Tải kết quả CSV",
-                                csv_result, "batch_predictions.csv", "text/csv",
-                                use_container_width=True,
-                            )
-                        with col_bdown2:
-                            try:
-                                excel_result = to_excel(result_df)
-                                st.download_button(
-                                    "📥 Tải kết quả Excel (.xlsx)",
-                                    excel_result, "batch_predictions.xlsx",
-                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    use_container_width=True,
-                                )
-                            except Exception as e:
-                                st.error(f"Lỗi xuất Excel: {e}")
 
-            except Exception as e:
-                st.error(f"❌ Lỗi: {e}")
+            # --- KPI Cards ---
+            total_students = len(result_df)
+            num_critical = len(result_df[result_df["risk_level"] == "🔴 Cao"])
+            num_warning = len(result_df[result_df["risk_level"] == "🟠 Cảnh báo"])
+            num_monitor = len(result_df[result_df["risk_level"] == "🟡 Theo dõi"])
+            num_safe = len(result_df[result_df["risk_level"] == "🟢 An toàn"])
+
+            # Render KPI
+            kpi_cols = st.columns(4)
+            with kpi_cols[0]:
+                st.markdown(f"""
+                <div style="background-color: #FEE2E2; border-left: 5px solid #EF4444; padding: 15px; border-radius: 8px;">
+                    <h5 style="color: #991B1B; margin: 0; font-weight: 700; font-size: 0.95rem;">🔴 Nguy cơ Cao</h5>
+                    <h2 style="color: #EF4444; margin: 5px 0 0 0; font-weight: 800; font-size: 1.8rem;">{num_critical} <span style="font-size: 0.85rem; font-weight: 400; color: #7F1D1D;">({num_critical/total_students*100:.1f}%)</span></h2>
+                    <p style="color: #7F1D1D; margin: 5px 0 0 0; font-size: 0.75rem; font-weight: 500;">Cần can thiệp ngay lập tức</p>
+                </div>
+                """, unsafe_allow_html=True)
+            with kpi_cols[1]:
+                st.markdown(f"""
+                <div style="background-color: #FEF3C7; border-left: 5px solid #F59E0B; padding: 15px; border-radius: 8px;">
+                    <h5 style="color: #92400E; margin: 0; font-weight: 700; font-size: 0.95rem;">🟠 Cần hỗ trợ</h5>
+                    <h2 style="color: #F59E0B; margin: 5px 0 0 0; font-weight: 800; font-size: 1.8rem;">{num_warning} <span style="font-size: 0.85rem; font-weight: 400; color: #78350F;">({num_warning/total_students*100:.1f}%)</span></h2>
+                    <p style="color: #78350F; margin: 5px 0 0 0; font-size: 0.75rem; font-weight: 500;">Cần giáo viên kèm cặp</p>
+                </div>
+                """, unsafe_allow_html=True)
+            with kpi_cols[2]:
+                st.markdown(f"""
+                <div style="background-color: #DBEAFE; border-left: 5px solid #3B82F6; padding: 15px; border-radius: 8px;">
+                    <h5 style="color: #1E40AF; margin: 0; font-weight: 700; font-size: 0.95rem;">🟡 Cần theo dõi</h5>
+                    <h2 style="color: #3B82F6; margin: 5px 0 0 0; font-weight: 800; font-size: 1.8rem;">{num_monitor} <span style="font-size: 0.85rem; font-weight: 400; color: #1E3A8A;">({num_monitor/total_students*100:.1f}%)</span></h2>
+                    <p style="color: #1E3A8A; margin: 5px 0 0 0; font-size: 0.75rem; font-weight: 500;">Có dấu hiệu sa sút nhẹ</p>
+                </div>
+                """, unsafe_allow_html=True)
+            with kpi_cols[3]:
+                st.markdown(f"""
+                <div style="background-color: #D1FAE5; border-left: 5px solid #10B981; padding: 15px; border-radius: 8px;">
+                    <h5 style="color: #065F46; margin: 0; font-weight: 700; font-size: 0.95rem;">🟢 An toàn</h5>
+                    <h2 style="color: #10B981; margin: 5px 0 0 0; font-weight: 800; font-size: 1.8rem;">{num_safe} <span style="font-size: 0.85rem; font-weight: 400; color: #064E3B;">({num_safe/total_students*100:.1f}%)</span></h2>
+                    <p style="color: #064E3B; margin: 5px 0 0 0; font-size: 0.75rem; font-weight: 500;">Học tập tích cực, ổn định</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # --- Visualizations ---
+            st.write("")
+            chart_col1, chart_col2 = st.columns(2)
+            with chart_col1:
+                st.plotly_chart(plot_risk_level_distribution(result_df), use_container_width=True)
+            with chart_col2:
+                st.plotly_chart(plot_risk_by_class(result_df), use_container_width=True)
+
+            # --- Emergency Action Report Export ---
+            st.subheader("📥 Xuất báo cáo danh sách can thiệp khẩn cấp")
+            emergency_df = result_df[result_df["risk_level"].isin(["🔴 Cao", "🟠 Cảnh báo"])].copy()
+
+            col_bdown1, col_bdown2 = st.columns(2)
+            with col_bdown1:
+                st.download_button(
+                    "📥 Tải danh sách can thiệp (CSV)",
+                    emergency_df.to_csv(index=False, encoding="utf-8-sig"),
+                    "danh_sach_can_thiep_khan_cap.csv", "text/csv",
+                    use_container_width=True,
+                    help="Chỉ xuất danh sách những học sinh có rủi ro Cao hoặc Cảnh báo để can thiệp kịp thời."
+                )
+            with col_bdown2:
+                try:
+                    excel_emergency = to_excel(emergency_df)
+                    st.download_button(
+                        "📥 Tải danh sách can thiệp (Excel)",
+                        excel_emergency, "danh_sach_can_thiep_khan_cap.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                        help="Tải báo cáo can thiệp khẩn cấp dưới dạng Excel (.xlsx)."
+                    )
+                except Exception as e:
+                    st.error(f"Lỗi xuất Excel can thiệp: {e}")
+
+            # --- Priority Alerts List ---
+            st.subheader("🔴 Danh sách cần can thiệp học thuật ưu tiên (Nguy cơ Cao & Cần hỗ trợ)")
+            if not emergency_df.empty:
+                disp_emergency = emergency_df.copy()
+                cols_to_show = ["student_id", "class_name", "risk_level", "risk_score", "avg_score", "min_score", "attendance_rate", "assignment_completion_rate"]
+                
+                # Chỉ lấy các cột thực tế tồn tại trong dataframe để hiển thị tránh KeyError
+                available_show_cols = [col for col in cols_to_show if col in disp_emergency.columns]
+                disp_emergency = disp_emergency[available_show_cols]
+                
+                rename_map = {
+                    "student_id": "Mã học sinh",
+                    "class_name": "Lớp",
+                    "risk_level": "Mức độ rủi ro",
+                    "risk_score": "Điểm rủi ro",
+                    "avg_score": "ĐTB chung",
+                    "min_score": "Điểm liệt thấp nhất",
+                    "attendance_rate": "Chuyên cần (%)",
+                    "assignment_completion_rate": "Hoàn thành BT (%)"
+                }
+                # Lọc lại bản đồ rename chỉ với cột thực tế có mặt
+                rename_map = {k: v for k, v in rename_map.items() if k in available_show_cols}
+                disp_emergency = disp_emergency.rename(columns=rename_map)
+                
+                st.dataframe(disp_emergency, use_container_width=True, hide_index=True)
+
+                # --- Tra cứu chi tiết ---
+                st.write("")
+                with st.expander("🔍 Tra cứu chi tiết cờ cảnh báo & Kế hoạch can thiệp từng học sinh", expanded=False):
+                    if "student_id" in emergency_df.columns:
+                        student_ids_list = emergency_df["student_id"].tolist()
+                        selected_sid = st.selectbox("Chọn Mã học sinh để tra cứu chi tiết:", student_ids_list)
+                        stud_data = emergency_df[emergency_df["student_id"] == selected_sid].iloc[0]
+                    else:
+                        st.info("ℹ️ Không tìm thấy cột 'student_id' trong file. Tra cứu theo dòng dữ liệu:")
+                        student_ids_list = [f"Học sinh số {i+1} (Dòng {idx+1})" for idx, i in enumerate(emergency_df.index)]
+                        selected_sid_label = st.selectbox("Chọn học sinh để tra cứu:", student_ids_list)
+                        idx_sel = student_ids_list.index(selected_sid_label)
+                        stud_data = emergency_df.iloc[idx_sel]
+                        selected_sid = stud_data.get("student_id", f"Học sinh (Dòng {idx_sel+1})")
+
+                    if selected_sid:
+                        class_lbl = stud_data.get("class_name", "Chung (Không chia lớp)")
+                        st.markdown(f"#### 👤 Học sinh: `{selected_sid}` | Lớp: `{class_lbl}`")
+
+
+                        col_stud1, col_stud2 = st.columns(2)
+                        col_stud1.metric("🔴 Điểm rủi ro học đường", f"{stud_data['risk_score']} / 100")
+                        col_stud2.metric("🎯 AI Dự báo phân loại", stud_data["final_prediction"])
+
+                        st.markdown("##### 🚨 Các cờ cảnh báo rủi ro cụ thể:")
+                        flags = stud_data["warning_flags_str"].split("; ")
+                        for f in flags:
+                            if f:
+                                st.write(f"- {f}")
+
+                        st.markdown("##### 🤝 Khuyến nghị can thiệp cụ thể dành cho Giáo viên:")
+                        recs = stud_data["recommendations_str"].split("; ")
+                        for r in recs:
+                            if r:
+                                st.write(f"- {r}")
+            else:
+                st.success("🎉 Tuyệt vời! Không có học sinh nào nằm trong diện rủi ro Cao hay Cần hỗ trợ học tập.")
+
+            # --- Full Dataset Predictions ---
+            st.subheader("📋 Bảng kết quả dự đoán & Chỉ số rủi ro đầy đủ")
+            full_display_cols = ["student_id", "class_name", "final_prediction", "risk_level", "risk_score", "attendance_rate", "avg_score"]
+            available_full_cols = [col for col in full_display_cols if col in result_df.columns]
+            st.dataframe(result_df[available_full_cols], use_container_width=True, hide_index=True)
+
+
+            # Tải toàn bộ
+            col_fdown1, col_fdown2 = st.columns(2)
+            with col_fdown1:
+                st.download_button(
+                    "📥 Tải toàn bộ kết quả dự đoán (CSV)",
+                    result_df.to_csv(index=False, encoding="utf-8-sig"),
+                    "toan_bo_ket_qua_du_doan.csv", "text/csv",
+                    use_container_width=True
+                )
+            with col_fdown2:
+                try:
+                    excel_full = to_excel(result_df)
+                    st.download_button(
+                        "📥 Tải toàn bộ kết quả dự đoán (Excel)",
+                        excel_full, "toan_bo_ket_qua_du_doan.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
+                except Exception as e:
+                    st.error(f"Lỗi xuất Excel kết quả dự đoán: {e}")
+
+
 
 # ============================================================
 # TAB 7: GIẢI THÍCH MÔ HÌNH
@@ -834,6 +1051,12 @@ with tab7:
         st.markdown("---")
         st.subheader("📐 Logic Rule Engine")
         st.markdown(explain_rule_engine_logic())
+
+        # Số hóa chỉ số định tính trong Giáo dục
+        st.markdown("---")
+        st.subheader("📐 Số hóa & Quy đổi các chỉ số định tính")
+        st.markdown(explain_qualitative_metrics())
+
 
         # Confusion Matrix
         st.markdown("---")
