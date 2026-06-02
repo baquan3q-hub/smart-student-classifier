@@ -315,3 +315,45 @@ def plot_risk_by_class(df: pd.DataFrame) -> go.Figure:
     
     return fig
 
+
+def plot_chua_dat_by_grade(df: pd.DataFrame) -> go.Figure:
+    """Vẽ biểu đồ cột thống kê học sinh Chưa đạt (cần hỗ trợ) theo từng khối lớp."""
+    # Tránh thay đổi df gốc
+    df_copy = df.copy()
+    
+    if "class_name" not in df_copy.columns:
+        df_copy["class_name"] = "Chung"
+        
+    df_copy["grade"] = df_copy["class_name"].apply(
+        lambda x: f"Khối {x[0]}" if isinstance(x, str) and x[0].isdigit() else "Khác"
+    )
+    
+    # Lọc học sinh Chưa đạt
+    chua_dat_df = df_copy[df_copy["learning_result_label"] == "Chưa đạt"]
+    
+    # Lấy danh sách khối lớp được sắp xếp
+    all_grades = sorted(df_copy["grade"].unique())
+    counts = chua_dat_df.groupby("grade").size().reindex(all_grades, fill_value=0)
+    
+    fig = go.Figure(data=[
+        go.Bar(
+            x=counts.index,
+            y=counts.values,
+            marker_color="#EF4444", # Màu đỏ của nhãn Chưa đạt
+            text=counts.values,
+            textposition="auto",
+            textfont=dict(size=14, color="white"),
+        )
+    ])
+    
+    fig.update_layout(
+        title="Số học sinh Chưa đạt (cần hỗ trợ) theo từng Khối lớp",
+        xaxis_title="Khối lớp",
+        yaxis_title="Số lượng học sinh",
+        template="plotly_white",
+        height=400,
+        showlegend=False,
+    )
+    
+    return fig
+

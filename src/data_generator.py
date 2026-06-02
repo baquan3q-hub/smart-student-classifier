@@ -24,9 +24,9 @@ from src.rule_engine import calculate_dtb_mhk, classify_learning_result
 from src.utils import generate_vietnamese_name
 
 
-def _generate_student_ids(num_students: int) -> list[str]:
+def _generate_student_ids(num_students: int, start_idx: int = 1) -> list[str]:
     """Sinh danh sách mã học sinh."""
-    return [f"HS{i:03d}" for i in range(1, num_students + 1)]
+    return [f"HS{i:03d}" for i in range(start_idx, start_idx + num_students)]
 
 
 def _assign_classes(student_ids: list[str], classes: list[str]) -> dict[str, str]:
@@ -54,8 +54,10 @@ def _generate_student_tier(rng: np.random.Generator, data_profile: str = "balanc
         tiers = ["tot", "kha", "dat", "chua_dat", "adversarial_tot", "adversarial_kha"]
         p = [0.03, 0.10, 0.30, 0.45, 0.06, 0.06]
     else:  # balanced hoặc mid_semester
+        # Đã điều chỉnh tỷ lệ Chưa đạt thực tế về khoảng 10% tổng số lớp học
+        # (chua_dat (6%) + adversarial_tot (2%) + adversarial_kha (2%) = 10%)
         tiers = ["tot", "kha", "dat", "chua_dat", "adversarial_tot", "adversarial_kha"]
-        p = [0.20, 0.28, 0.26, 0.16, 0.05, 0.05]
+        p = [0.25, 0.40, 0.25, 0.06, 0.02, 0.02]
 
     return rng.choice(tiers, p=p)
 
@@ -91,9 +93,10 @@ def _generate_scores_for_tier(
     elif effective_tier == "dat":
         # Điểm trung bình: 4.0-7.0, xu hướng 5.0-6.0
         base = rng.uniform(4.5, 6.5)
-        regular = [round(max(0, min(10, base + rng.normal(0, 1.2))), 1) for _ in range(num_regular)]
-        midterm = round(max(0, min(10, base + rng.normal(0, 1.0))), 1)
-        final = round(max(0, min(10, base + rng.normal(0, 1.0))), 1)
+        # Giảm độ lệch chuẩn từ 1.2/1.0 xuống 0.8/0.7 để tránh điểm liệt dưới 3.5 cho tier Đạt
+        regular = [round(max(0, min(10, base + rng.normal(0, 0.8))), 1) for _ in range(num_regular)]
+        midterm = round(max(0, min(10, base + rng.normal(0, 0.7))), 1)
+        final = round(max(0, min(10, base + rng.normal(0, 0.7))), 1)
 
     else:  # chua_dat
         # Điểm thấp: 2.0-5.5, có thể có môn < 3.5
@@ -142,18 +145,20 @@ def _generate_behavior_for_tier(
 
     elif effective_tier == "kha":
         total_sessions = rng.integers(80, 100)
-        attend_rate = rng.uniform(78, 95)
+        # Nâng nhẹ attendance lên để tránh sát nút 75%
+        attend_rate = rng.uniform(82, 97)
         total_assignments = rng.integers(30, 50)
-        assign_rate = rng.uniform(75, 95)
+        assign_rate = rng.uniform(78, 96)
         participation = round(rng.uniform(6.0, 8.5), 1)
         behavior = round(rng.uniform(6.0, 8.5), 1)
         teacher_eval = round(rng.uniform(6.0, 8.5), 1)
 
     elif effective_tier == "dat":
         total_sessions = rng.integers(80, 100)
-        attend_rate = rng.uniform(65, 85)
+        # Nâng lên tối thiểu 76% để tránh bị Chưa đạt do chuyên cần < 75% cho nhóm học sinh Đạt
+        attend_rate = rng.uniform(76, 90)
         total_assignments = rng.integers(30, 50)
-        assign_rate = rng.uniform(60, 85)
+        assign_rate = rng.uniform(65, 85)
         participation = round(rng.uniform(4.5, 7.0), 1)
         behavior = round(rng.uniform(4.5, 7.0), 1)
         teacher_eval = round(rng.uniform(4.5, 7.0), 1)
@@ -199,6 +204,8 @@ def generate_raw_data(
     num_students: int = NUM_STUDENTS,
     random_state: int = 42,
     data_profile: str = "balanced",
+    start_idx: int = 1,
+    is_mid_sem: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Sinh toàn bộ dữ liệu thô cho hệ thống.
@@ -207,28 +214,45 @@ def generate_raw_data(
         num_students: Số lượng học sinh cần sinh.
         random_state: Seed cho reproducibility.
         data_profile: Cấu hình phân phối dữ liệu (balanced, high_performing, at_risk, mid_semester).
+        start_idx: Chỉ số bắt đầu sinh mã học sinh (default: 1).
 
     Returns:
         (profiles_df, scores_df, comments_df)
     """
     rng = np.random.default_rng(random_state)
 
-    student_ids = _generate_student_ids(num_students)
+    student_ids = _generate_student_ids(num_students, start_idx)
     class_assignments = _assign_classes(student_ids, CLASSES)
 
     # Gán tier cho mỗi học sinh (cố định qua cả 2 kỳ)
     student_tiers = {sid: _generate_student_tier(rng, data_profile) for sid in student_ids}
 
+    # Gán loại nghịch cảnh ngẫu nhiên (adversarial cases) cho một số học sinh tốt/khá
+    # để mô hình AI học cách xử lý các điều kiện loại trừ (loại chuyên cần và nhận xét)
+    student_adversarials = {}
+    for sid in student_ids:
+        if student_tiers[sid] in ["tot", "kha"]:
+            r = rng.random()
+            if r < 0.05:
+                student_adversarials[sid] = "low_attendance"
+            elif r < 0.10:
+                student_adversarials[sid] = "single_comment"
+            else:
+                student_adversarials[sid] = "none"
+        else:
+            student_adversarials[sid] = "none"
+
     profiles_rows = []
     scores_rows = []
     comments_rows = []
 
-    is_mid_sem = data_profile == "mid_semester"
+    # is_mid_sem được lấy trực tiếp từ tham số truyền vào chứ không phụ thuộc vào data_profile nữa
 
     for sid in student_ids:
         tier = student_tiers[sid]
         class_name = class_assignments[sid]
         student_name = generate_vietnamese_name(int(sid[2:]))
+        adv_type = student_adversarials.get(sid, "none")
 
         # Lưu DTB_mhk theo kỳ để tính previous_avg
         semester_avgs = {}
@@ -262,7 +286,21 @@ def generate_raw_data(
                 })
 
             # --- Sinh nhận xét cho từng môn nhận xét ---
-            if tier in ["adversarial_tot", "adversarial_kha"]:
+            if adv_type == "single_comment":
+                # Nghịch cảnh: Đúng 1 môn nhận xét Chưa đạt, 2 môn còn lại Đạt
+                fail_subject = rng.choice(COMMENT_SUBJECTS)
+                for subject in COMMENT_SUBJECTS:
+                    status = "Chưa đạt" if subject == fail_subject else "Đạt"
+                    comments_rows.append({
+                        "student_id": sid,
+                        "class_name": class_name,
+                        "school_year": SCHOOL_YEAR,
+                        "semester": semester,
+                        "subject_name": subject,
+                        "assessment_type": "comment",
+                        "comment_status": status,
+                    })
+            elif tier in ["adversarial_tot", "adversarial_kha"]:
                 # Chọn ngẫu nhiên 2 môn nhận xét làm "Chưa đạt", môn còn lại làm "Đạt"
                 fail_subjects = rng.choice(COMMENT_SUBJECTS, size=2, replace=False)
                 for subject in COMMENT_SUBJECTS:
@@ -294,6 +332,12 @@ def generate_raw_data(
 
             # --- Sinh profile/hành vi ---
             behavior = _generate_behavior_for_tier(tier, rng)
+
+            if adv_type == "low_attendance":
+                # Nghịch cảnh: Chuyên cần thấp dưới 75%
+                low_att = round(rng.uniform(65.0, 74.0), 1)
+                behavior["attendance_rate"] = low_att
+                behavior["attended_sessions"] = int(round(behavior["total_sessions"] * low_att / 100))
 
             # previous_average_score: kỳ trước hoặc random
             if semester == "HK1":
@@ -355,14 +399,17 @@ def generate_all_data(
     """
     ensure_directories()
 
-    # Sinh raw data
-    profiles_df, scores_df, comments_df = generate_raw_data(num_students, random_state, data_profile)
-
-    # Sinh processed features
+    # Sinh raw data và processed features dựa trên data_profile
     from src.feature_engineering import build_student_features
-    period_val = "MID_SEMESTER" if data_profile == "mid_semester" else "YEAR"
-    features_df = build_student_features(profiles_df, scores_df, comments_df, period=period_val)
 
+    if data_profile == "mid_semester":
+        # Sinh 100% dữ liệu giữa kỳ với profile balanced (phục vụ kịch bản đặc biệt)
+        profiles_df, scores_df, comments_df = generate_raw_data(num_students, random_state, "balanced", 1, is_mid_sem=True)
+        features_df = build_student_features(profiles_df, scores_df, comments_df, period="MID_SEMESTER")
+    else:
+        # Sinh 100% dữ liệu Cả năm (YEAR) để dữ liệu huấn luyện sạch và chính xác nhất
+        profiles_df, scores_df, comments_df = generate_raw_data(num_students, random_state, data_profile, 1, is_mid_sem=False)
+        features_df = build_student_features(profiles_df, scores_df, comments_df, period="YEAR")
 
     if save:
         # Lưu raw data

@@ -32,6 +32,7 @@ FEATURE_NAMES_VI = {
     "behavior_score": "Điểm hành vi",
     "teacher_evaluation_score": "Điểm đánh giá giáo viên",
     "progress_delta": "Mức tiến bộ",
+    "is_mid_semester": "Thời điểm giữa kỳ",
 }
 
 

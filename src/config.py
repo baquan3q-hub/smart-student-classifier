@@ -81,6 +81,7 @@ FEATURE_COLUMNS = [
     "behavior_score",
     "teacher_evaluation_score",
     "progress_delta",
+    "is_mid_semester",
 ]
 
 # ============================================================

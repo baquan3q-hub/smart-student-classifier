@@ -40,7 +40,7 @@ from src.recommendations import generate_recommendations, get_risk_level
 from src.visualization import (
     plot_label_distribution, plot_label_pie, plot_confusion_matrix,
     plot_feature_importance, plot_metrics_comparison, plot_score_distribution,
-    plot_risk_level_distribution, plot_risk_by_class,
+    plot_risk_level_distribution, plot_risk_by_class, plot_chua_dat_by_grade,
 )
 from src.utils import get_label_emoji, get_label_color
 
@@ -53,7 +53,8 @@ def get_student_raw_table(student_features: dict) -> pd.DataFrame:
         "avg_score", "min_score", "max_score", "std_score",
         "count_score_ge_8", "count_score_ge_6_5", "count_score_ge_5", "count_score_lt_3_5",
         "comment_not_pass_count", "attendance_rate", "assignment_completion_rate", 
-        "participation_score", "behavior_score", "teacher_evaluation_score", "progress_delta"
+        "participation_score", "behavior_score", "teacher_evaluation_score", "progress_delta",
+        "is_mid_semester"
     ]
     
     rows = []
@@ -67,6 +68,8 @@ def get_student_raw_table(student_features: dict) -> pd.DataFrame:
             display_val = int(val)
         elif col in ["progress_delta"]:
             display_val = f"{float(val):+.1f}" if float(val) != 0 else "0.0"
+        elif col == "is_mid_semester":
+            display_val = "Giữa học kỳ" if int(val) == 1 else "Cuối kỳ / Cả năm"
         else:
             display_val = round(float(val), 2)
             
@@ -76,6 +79,260 @@ def get_student_raw_table(student_features: dict) -> pd.DataFrame:
         })
         
     return pd.DataFrame(rows)
+
+
+def generate_class_sample_data(is_mid_semester: bool = False) -> pd.DataFrame:
+    """
+    Tạo dữ liệu mô phỏng gồm 1 lớp học (9A1) khoảng 40 học sinh đầy đủ thông tin:
+    mã học sinh, tên học sinh, lớp, và các chỉ số đặc trưng.
+    Đảm bảo có đúng 20 học sinh nằm trong các mức rủi ro chia đều:
+    - 7 học sinh mức Cao (🔴 Cao)
+    - 7 học sinh mức Cảnh báo (🟠 Cảnh báo)
+    - 6 học sinh mức Theo dõi (🟡 Theo dõi)
+    - 20 học sinh mức An toàn (🟢 An toàn)
+    """
+    names = [
+        "Nguyễn Văn An", "Trần Thị Bình", "Lê Hoàng Châu", "Phạm Minh Đức", "Hoàng Thu Giang",
+        "Vũ Hồng Hạnh", "Ngô Quốc Khánh", "Đỗ Lan Hương", "Bùi Duy Mạnh", "Phan Thanh Nam",
+        "Đặng Minh Ngọc", "Đỗ Đức Nhân", "Nguyễn Hồng Sơn", "Trần Việt Thắng", "Phạm Ngọc Trinh",
+        "Lê Bảo Trâm", "Vũ Hoàng Việt", "Hoàng Hải Yến", "Nguyễn Tuấn Anh", "Trần Minh Quân",
+        "Lê Thanh Thảo", "Phạm Văn Nam", "Nguyễn Thị Mai", "Trần Hữu Đạt", "Lê Gia Bảo",
+        "Phạm Thùy Linh", "Hoàng Quốc Việt", "Nguyễn Hoài Nam", "Trần Thu Trang", "Lê Quang Huy",
+        "Vũ Khánh Ly", "Đỗ Tiến Đạt", "Nguyễn Bảo Ngọc", "Trần Thế Anh", "Phạm Đình Phong",
+        "Lê Thị Hoa", "Hoàng Văn Hùng", "Nguyễn Minh Hằng", "Trần Thanh Tâm", "Lê Hữu Phước"
+    ]
+    
+    rows = []
+    
+    # 1. 7 học sinh nhóm ĐỎ (🔴 Cao)
+    # HS1: Chuyên cần rất thấp (65%) -> Vi phạm Thông tư 22
+    rows.append({
+        "student_id": "HS0001", "student_name": names[0], "class_name": "9A1",
+        "avg_score": 5.4, "min_score": 4.0, "max_score": 7.0, "std_score": 1.1,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 2, "count_score_ge_5": 6, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 0, "attendance_rate": 65.0, "assignment_completion_rate": 55.0,
+        "participation_score": 4.5, "behavior_score": 5.0, "teacher_evaluation_score": 5.0, "progress_delta": -1.5
+    })
+    # HS2: Điểm liệt môn học (2.5) -> Vi phạm Thông tư 22
+    rows.append({
+        "student_id": "HS0002", "student_name": names[1], "class_name": "9A1",
+        "avg_score": 5.1, "min_score": 2.5, "max_score": 8.2, "std_score": 1.8,
+        "count_score_ge_8": 1, "count_score_ge_6_5": 3, "count_score_ge_5": 5, "count_score_lt_3_5": 1,
+        "comment_not_pass_count": 0, "attendance_rate": 88.0, "assignment_completion_rate": 70.0,
+        "participation_score": 5.5, "behavior_score": 6.0, "teacher_evaluation_score": 5.5, "progress_delta": -0.8
+    })
+    # HS3: Nhận xét yếu >= 2 (2 môn) -> Vi phạm Thông tư 22
+    rows.append({
+        "student_id": "HS0003", "student_name": names[2], "class_name": "9A1",
+        "avg_score": 6.2, "min_score": 5.0, "max_score": 7.8, "std_score": 0.9,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 4, "count_score_ge_5": 8, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 2, "attendance_rate": 92.0, "assignment_completion_rate": 85.0,
+        "participation_score": 6.5, "behavior_score": 7.0, "teacher_evaluation_score": 6.5, "progress_delta": 0.2
+    })
+    # HS4: GPA yếu kém < 5.0 (4.5) -> Vi phạm Thông tư 22
+    rows.append({
+        "student_id": "HS0004", "student_name": names[3], "class_name": "9A1",
+        "avg_score": 4.5, "min_score": 3.8, "max_score": 6.0, "std_score": 0.7,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 0, "count_score_ge_5": 3, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 0, "attendance_rate": 80.0, "assignment_completion_rate": 62.0,
+        "participation_score": 4.0, "behavior_score": 5.5, "teacher_evaluation_score": 4.5, "progress_delta": -1.2
+    })
+    # HS5: GPA yếu kém và chuyên cần thấp (min=3.0, chuyên cần=72%)
+    rows.append({
+        "student_id": "HS0005", "student_name": names[4], "class_name": "9A1",
+        "avg_score": 4.8, "min_score": 3.0, "max_score": 6.5, "std_score": 1.2,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 1, "count_score_ge_5": 4, "count_score_lt_3_5": 1,
+        "comment_not_pass_count": 1, "attendance_rate": 72.0, "assignment_completion_rate": 50.0,
+        "participation_score": 3.5, "behavior_score": 4.5, "teacher_evaluation_score": 4.0, "progress_delta": -2.1
+    })
+    # HS6: Số môn trên trung bình thấp (chỉ có 4 môn >= 5.0) -> Vi phạm Thông tư 22
+    rows.append({
+        "student_id": "HS0006", "student_name": names[5], "class_name": "9A1",
+        "avg_score": 4.9, "min_score": 3.6, "max_score": 6.8, "std_score": 1.1,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 1, "count_score_ge_5": 4, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 0, "attendance_rate": 86.0, "assignment_completion_rate": 65.0,
+        "participation_score": 5.0, "behavior_score": 6.0, "teacher_evaluation_score": 5.0, "progress_delta": -0.5
+    })
+    # HS7: Điểm rủi ro tổng hợp cao (Điểm liệt + chuyên cần thấp + lười học)
+    rows.append({
+        "student_id": "HS0007", "student_name": names[6], "class_name": "9A1",
+        "avg_score": 5.0, "min_score": 3.2, "max_score": 7.0, "std_score": 1.2,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 2, "count_score_ge_5": 5, "count_score_lt_3_5": 1,
+        "comment_not_pass_count": 1, "attendance_rate": 76.0, "assignment_completion_rate": 58.0,
+        "participation_score": 4.0, "behavior_score": 5.0, "teacher_evaluation_score": 4.5, "progress_delta": -1.8
+    })
+
+    # 2. 7 học sinh nhóm CAM (🟠 Cảnh báo)
+    # Điểm rủi ro trung bình cao (45 - 74), không bị vi phạm điều kiện chưa đạt cứng.
+    # HS8:
+    rows.append({
+        "student_id": "HS0008", "student_name": names[7], "class_name": "9A1",
+        "avg_score": 5.5, "min_score": 4.5, "max_score": 7.0, "std_score": 0.8,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 2, "count_score_ge_5": 7, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 0, "attendance_rate": 82.0, "assignment_completion_rate": 72.0,
+        "participation_score": 5.5, "behavior_score": 6.0, "teacher_evaluation_score": 5.5, "progress_delta": -0.5
+    })
+    # HS9:
+    rows.append({
+        "student_id": "HS0009", "student_name": names[8], "class_name": "9A1",
+        "avg_score": 5.3, "min_score": 4.2, "max_score": 6.8, "std_score": 0.8,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 1, "count_score_ge_5": 6, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 0, "attendance_rate": 84.0, "assignment_completion_rate": 68.0,
+        "participation_score": 5.0, "behavior_score": 5.5, "teacher_evaluation_score": 5.0, "progress_delta": -0.9
+    })
+    # HS10:
+    rows.append({
+        "student_id": "HS0010", "student_name": names[9], "class_name": "9A1",
+        "avg_score": 5.8, "min_score": 4.0, "max_score": 7.5, "std_score": 1.0,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 3, "count_score_ge_5": 7, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 1, "attendance_rate": 83.0, "assignment_completion_rate": 75.0,
+        "participation_score": 5.5, "behavior_score": 6.5, "teacher_evaluation_score": 6.0, "progress_delta": -0.4
+    })
+    # HS11:
+    rows.append({
+        "student_id": "HS0011", "student_name": names[10], "class_name": "9A1",
+        "avg_score": 5.2, "min_score": 4.3, "max_score": 6.5, "std_score": 0.7,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 1, "count_score_ge_5": 6, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 0, "attendance_rate": 81.0, "assignment_completion_rate": 65.0,
+        "participation_score": 4.8, "behavior_score": 5.5, "teacher_evaluation_score": 5.0, "progress_delta": -1.1
+    })
+    # HS12:
+    rows.append({
+        "student_id": "HS0012", "student_name": names[11], "class_name": "9A1",
+        "avg_score": 5.6, "min_score": 4.6, "max_score": 7.2, "std_score": 0.9,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 2, "count_score_ge_5": 7, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 0, "attendance_rate": 80.0, "assignment_completion_rate": 70.0,
+        "participation_score": 5.0, "behavior_score": 6.0, "teacher_evaluation_score": 5.5, "progress_delta": -0.7
+    })
+    # HS13:
+    rows.append({
+        "student_id": "HS0013", "student_name": names[12], "class_name": "9A1",
+        "avg_score": 5.4, "min_score": 4.1, "max_score": 7.0, "std_score": 0.9,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 2, "count_score_ge_5": 6, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 0, "attendance_rate": 82.5, "assignment_completion_rate": 67.5,
+        "participation_score": 5.0, "behavior_score": 5.5, "teacher_evaluation_score": 5.0, "progress_delta": -0.6
+    })
+    # HS14:
+    rows.append({
+        "student_id": "HS0014", "student_name": names[13], "class_name": "9A1",
+        "avg_score": 5.7, "min_score": 4.4, "max_score": 7.4, "std_score": 1.0,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 2, "count_score_ge_5": 7, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 1, "attendance_rate": 81.5, "assignment_completion_rate": 73.0,
+        "participation_score": 5.2, "behavior_score": 6.0, "teacher_evaluation_score": 5.8, "progress_delta": -0.8
+    })
+
+    # 3. 6 học sinh nhóm VÀNG (🟡 Theo dõi)
+    # Điểm rủi ro từ 25 đến 44
+    # HS15:
+    rows.append({
+        "student_id": "HS0015", "student_name": names[14], "class_name": "9A1",
+        "avg_score": 6.2, "min_score": 5.0, "max_score": 7.8, "std_score": 0.9,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 4, "count_score_ge_5": 8, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 0, "attendance_rate": 88.0, "assignment_completion_rate": 80.0,
+        "participation_score": 6.0, "behavior_score": 7.0, "teacher_evaluation_score": 6.5, "progress_delta": -0.4
+    })
+    # HS16:
+    rows.append({
+        "student_id": "HS0016", "student_name": names[15], "class_name": "9A1",
+        "avg_score": 6.0, "min_score": 4.8, "max_score": 7.5, "std_score": 0.8,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 3, "count_score_ge_5": 7, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 0, "attendance_rate": 87.0, "assignment_completion_rate": 78.0,
+        "participation_score": 5.8, "behavior_score": 6.8, "teacher_evaluation_score": 6.2, "progress_delta": -0.3
+    })
+    # HS17:
+    rows.append({
+        "student_id": "HS0017", "student_name": names[16], "class_name": "9A1",
+        "avg_score": 6.4, "min_score": 5.2, "max_score": 8.0, "std_score": 0.9,
+        "count_score_ge_8": 1, "count_score_ge_6_5": 4, "count_score_ge_5": 8, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 0, "attendance_rate": 89.0, "assignment_completion_rate": 82.0,
+        "participation_score": 6.2, "behavior_score": 7.2, "teacher_evaluation_score": 6.8, "progress_delta": -0.5
+    })
+    # HS18:
+    rows.append({
+        "student_id": "HS0018", "student_name": names[17], "class_name": "9A1",
+        "avg_score": 5.9, "min_score": 4.5, "max_score": 7.2, "std_score": 0.8,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 3, "count_score_ge_5": 7, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 0, "attendance_rate": 86.5, "assignment_completion_rate": 76.5,
+        "participation_score": 5.5, "behavior_score": 6.5, "teacher_evaluation_score": 6.0, "progress_delta": -0.2
+    })
+    # HS19:
+    rows.append({
+        "student_id": "HS0019", "student_name": names[18], "class_name": "9A1",
+        "avg_score": 6.1, "min_score": 4.9, "max_score": 7.6, "std_score": 0.8,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 3, "count_score_ge_5": 7, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 0, "attendance_rate": 85.0, "assignment_completion_rate": 81.0,
+        "participation_score": 5.9, "behavior_score": 6.9, "teacher_evaluation_score": 6.4, "progress_delta": -0.6
+    })
+    # HS20:
+    rows.append({
+        "student_id": "HS0020", "student_name": names[19], "class_name": "9A1",
+        "avg_score": 6.3, "min_score": 5.1, "max_score": 7.9, "std_score": 0.9,
+        "count_score_ge_8": 0, "count_score_ge_6_5": 4, "count_score_ge_5": 8, "count_score_lt_3_5": 0,
+        "comment_not_pass_count": 0, "attendance_rate": 88.5, "assignment_completion_rate": 83.5,
+        "participation_score": 6.1, "behavior_score": 7.1, "teacher_evaluation_score": 6.6, "progress_delta": -0.1
+    })
+
+    # 4. 20 học sinh nhóm XANH LÁ (🟢 An toàn)
+    # Điểm rủi ro thấp (< 25)
+    for i in range(20):
+        student_idx = 20 + i
+        if i % 3 == 0:  # HS Tốt
+            avg = round(8.4 + (i * 0.05), 1)
+            mn = round(7.0 + (i * 0.05), 1)
+            mx = round(9.5 + (i * 0.02), 1)
+            std = round(0.5 + (i * 0.01), 2)
+            c8 = 6
+            c65 = 8
+            c5 = 8
+            delta = round(0.2 + (i * 0.03), 1)
+        elif i % 3 == 1:  # HS Khá
+            avg = round(7.2 + (i * 0.03), 1)
+            mn = round(5.5 + (i * 0.04), 1)
+            mx = round(8.8 + (i * 0.02), 1)
+            std = round(0.8 + (i * 0.01), 2)
+            c8 = 2
+            c65 = 7
+            c5 = 8
+            delta = round(0.1 + (i * 0.02), 1)
+        else:  # HS Đạt
+            avg = round(6.2 + (i * 0.02), 1)
+            mn = round(5.0 + (i * 0.02), 1)
+            mx = round(8.0 + (i * 0.02), 1)
+            std = round(0.9 + (i * 0.01), 2)
+            c8 = 0
+            c65 = 4
+            c5 = 8
+            delta = 0.0
+            
+        rows.append({
+            "student_id": f"HS00{student_idx+1}", "student_name": names[student_idx], "class_name": "9A1",
+            "avg_score": avg, "min_score": mn, "max_score": mx, "std_score": std,
+            "count_score_ge_8": c8, "count_score_ge_6_5": c65, "count_score_ge_5": c5, "count_score_lt_3_5": 0,
+            "comment_not_pass_count": 0, "attendance_rate": round(95.0 + (i * 0.2), 1),
+            "assignment_completion_rate": round(92.0 + (i * 0.3), 1),
+            "participation_score": round(7.5 + (i * 0.1), 1), "behavior_score": round(8.0 + (i * 0.05), 1),
+            "teacher_evaluation_score": round(7.8 + (i * 0.05), 1), "progress_delta": delta
+        })
+        
+    df_res = pd.DataFrame(rows)
+    if is_mid_semester:
+        # Điều chỉnh nhẹ điểm để phản ánh trạng thái Giữa kỳ (chưa thi cuối kỳ)
+        df_res["avg_score"] = (df_res["avg_score"] - 0.3).clip(lower=0.0, upper=10.0).round(1)
+        df_res["min_score"] = (df_res["min_score"] - 0.2).clip(lower=0.0, upper=10.0).round(1)
+        df_res["max_score"] = (df_res["max_score"] - 0.2).clip(lower=0.0, upper=10.0).round(1)
+        df_res["progress_delta"] = (df_res["progress_delta"] * 0.5).round(1)
+        # Giữa kỳ thì tỷ lệ hoàn thành bài tập và chuyên cần có thể dao động nhẹ
+        df_res["attendance_rate"] = (df_res["attendance_rate"] - 1.0).clip(lower=0.0, upper=100.0).round(1)
+        df_res["assignment_completion_rate"] = (df_res["assignment_completion_rate"] - 2.0).clip(lower=0.0, upper=100.0).round(1)
+
+    # Thêm các cột đặc trưng bổ sung để hoàn toàn khớp với schema features
+    df_res["school_year"] = "2025-2026"
+    df_res["period"] = "MID_SEMESTER" if is_mid_semester else "YEAR"
+    df_res["is_mid_semester"] = 1 if is_mid_semester else 0
+    df_res["num_score_subjects"] = 8
+    df_res["num_comment_subjects"] = 3
+    df_res["comment_pass_count"] = 3 - df_res["comment_not_pass_count"]
+    return df_res
 
 
 # ============================================================
@@ -281,21 +538,74 @@ with tab1:
                 "Chuyên cần TB (%)": f"{g_subset['attendance_rate'].mean():.1f}",
                 "Số học sinh Chưa đạt": len(g_subset[g_subset[TARGET_COLUMN] == "Chưa đạt"]),
             })
-        st.dataframe(pd.DataFrame(grade_stats_data), use_container_width=True, hide_index=True)
+        grade_stats_df = pd.DataFrame(grade_stats_data)
+        st.dataframe(grade_stats_df, use_container_width=True, hide_index=True)
+
+        # Nút tải thống kê khối lớp dạng Excel
+        try:
+            grade_excel = to_excel(grade_stats_df)
+            st.download_button(
+                "📥 Tải Thống kê theo Khối lớp (Excel)",
+                grade_excel, "thong_ke_theo_khoi_lop.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                help="Tải báo cáo thống kê các khối lớp dạng file Excel."
+            )
+        except Exception as e:
+            st.error(f"Lỗi tạo Excel thống kê khối: {e}")
 
         # --- Biểu đồ phân bố điểm ---
         st.plotly_chart(plot_score_distribution(features_df), use_container_width=True)
 
         # --- Danh sách cần hỗ trợ ---
-        st.subheader("🚨 Học sinh cần hỗ trợ (Chưa đạt)")
+        st.subheader("🚨 Học sinh cần hỗ trợ (Chưa đạt) & Thống kê theo Khối")
         chua_dat = features_df[features_df[TARGET_COLUMN] == "Chưa đạt"]
         if len(chua_dat) > 0:
-            display_cols = ["student_id", "class_name", "avg_score", "min_score",
-                           "attendance_rate", "comment_not_pass_count"]
-            st.dataframe(
-                chua_dat[display_cols].sort_values("avg_score").head(20),
-                use_container_width=True, hide_index=True,
-            )
+            col_cd1, col_cd2 = st.columns([1, 1])
+            with col_cd1:
+                st.plotly_chart(plot_chua_dat_by_grade(features_df), use_container_width=True)
+            with col_cd2:
+                # Lựa chọn hiển thị toàn bộ hoặc chỉ top 20
+                show_all_cd = st.checkbox("Hiển thị toàn bộ danh sách học sinh Chưa đạt", value=False, key="show_all_chua_dat")
+                
+                # Tra cứu tên học sinh từ file raw profiles nếu có
+                chua_dat_display = chua_dat.copy()
+                if "student_name" not in chua_dat_display.columns and STUDENT_PROFILES_FILE.exists():
+                    try:
+                        profiles_df = pd.read_csv(STUDENT_PROFILES_FILE, encoding="utf-8-sig")
+                        if "student_name" in profiles_df.columns and "student_id" in profiles_df.columns:
+                            name_map = profiles_df.set_index("student_id")["student_name"].to_dict()
+                            chua_dat_display["student_name"] = chua_dat_display["student_id"].map(name_map)
+                    except Exception:
+                        pass
+                
+                # Xác định các cột hiển thị bao gồm tên thật nếu tìm thấy
+                display_cols = ["student_id"]
+                if "student_name" in chua_dat_display.columns:
+                    display_cols.append("student_name")
+                display_cols.extend(["class_name", "avg_score", "min_score", "attendance_rate", "comment_not_pass_count"])
+                
+                sorted_chua_dat = chua_dat_display[display_cols].sort_values("avg_score")
+                
+                if show_all_cd:
+                    st.write(f"**Danh sách toàn bộ ({len(sorted_chua_dat)} học sinh Chưa đạt):**")
+                    st.dataframe(sorted_chua_dat, use_container_width=True, hide_index=True)
+                else:
+                    st.write(f"**Danh sách học sinh nguy cơ cao (Top 20 học sinh điểm thấp nhất):**")
+                    st.dataframe(sorted_chua_dat.head(20), use_container_width=True, hide_index=True)
+                
+                # Nút tải danh sách Chưa đạt dạng Excel
+                try:
+                    chua_dat_excel = to_excel(sorted_chua_dat)
+                    st.download_button(
+                        "📥 Tải danh sách Học sinh cần hỗ trợ (Excel)",
+                        chua_dat_excel, "danh_sach_hoc_sinh_can_ho_tro.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                        help="Tải danh sách chi tiết các học sinh đang xếp loại Chưa đạt dạng file Excel."
+                    )
+                except Exception as e:
+                    st.error(f"Lỗi tạo Excel học sinh cần hỗ trợ: {e}")
         else:
             st.success("🎉 Không có học sinh nào ở mức Chưa đạt!")
 
@@ -488,9 +798,11 @@ with tab3:
             score_avgs = [student[f"avg_score"]] * int(student.get("num_score_subjects", 8))  # simplified
             comment_stats = ["Đạt"] * max(0, int(student.get("num_comment_subjects", 3)) - int(student.get("comment_not_pass_count", 0)))
             comment_stats += ["Chưa đạt"] * int(student.get("comment_not_pass_count", 0))
+            student_attendance = float(student.get("attendance_rate", 100.0))
             reason = get_classification_reason(
                 [student["avg_score"], student["min_score"]] + [student["avg_score"]] * 6,
-                comment_stats
+                comment_stats,
+                attendance_rate=student_attendance,
             )
             st.write(reason)
 
@@ -599,6 +911,7 @@ with tab5:
                 participation = st.number_input("Điểm tham gia", 1.0, 10.0, 7.0, 0.1)
                 behavior = st.number_input("Điểm hành vi", 1.0, 10.0, 7.0, 0.1)
                 teacher_eval = st.number_input("Đánh giá GV", 1.0, 10.0, 7.0, 0.1)
+                is_mid_sem_input = st.checkbox("📅 Đang ở thời điểm Giữa học kỳ", value=False, key="quick_is_mid_sem")
 
             features_input = {
                 "avg_score": avg_score, "min_score": min_score, "max_score": max_score,
@@ -608,6 +921,7 @@ with tab5:
                 "attendance_rate": attendance, "assignment_completion_rate": assignment,
                 "participation_score": participation, "behavior_score": behavior,
                 "teacher_evaluation_score": teacher_eval, "progress_delta": progress_delta,
+                "is_mid_semester": 1 if is_mid_sem_input else 0,
             }
 
             # Reconstruct score_averages cho Rule Engine (simplified)
@@ -712,6 +1026,8 @@ with tab5:
             st.subheader("Nhập điểm theo từng môn")
             st.info("Nhập điểm cho 8 môn đánh giá bằng điểm số và 3 môn đánh giá bằng nhận xét.")
 
+            is_mid_sem_input = st.checkbox("📅 Đang ở thời điểm Giữa học kỳ (Không có điểm thi cuối kỳ)", value=False, key="subject_is_mid_sem")
+
             score_data = {}
             cols = st.columns(4)
             for i, subject in enumerate(SCORE_SUBJECTS):
@@ -719,7 +1035,11 @@ with tab5:
                     with st.expander(f"📘 {subject}", expanded=False):
                         reg = st.text_input(f"Điểm TX ({subject})", "7.0;7.5;8.0", key=f"reg_{i}")
                         mid = st.number_input(f"Điểm GK", 0.0, 10.0, 7.0, 0.1, key=f"mid_{i}")
-                        fin = st.number_input(f"Điểm CK", 0.0, 10.0, 7.5, 0.1, key=f"fin_{i}")
+                        if is_mid_sem_input:
+                            fin = None
+                            st.caption("🔒 Điểm CK: (Trống)")
+                        else:
+                            fin = st.number_input(f"Điểm CK", 0.0, 10.0, 7.5, 0.1, key=f"fin_{i}")
                         score_data[subject] = {"regular": reg, "midterm": mid, "final": fin}
 
             comment_data = {}
@@ -766,6 +1086,7 @@ with tab5:
                         "behavior_score": beh_input,
                         "teacher_evaluation_score": tea_input,
                         "progress_delta": 0.0,
+                        "is_mid_semester": 1 if is_mid_sem_input else 0,
                     }
 
                     pred = predict_one(features_input, dtb_list, comment_list)
@@ -882,37 +1203,69 @@ with tab6:
                     with st.spinner("Đang chạy mô hình AI và tính toán rủi ro..."):
                         # Chạy dự đoán batch (đã tích hợp EWS trong predict_batch)
                         result_df = predict_batch(batch_df)
+                        
+                        # Chèn tên học sinh từ file profiles thô
+                        if "student_name" not in result_df.columns and STUDENT_PROFILES_FILE.exists():
+                            try:
+                                profiles_df = pd.read_csv(STUDENT_PROFILES_FILE, encoding="utf-8-sig")
+                                if "student_name" in profiles_df.columns and "student_id" in profiles_df.columns:
+                                    name_map = profiles_df.set_index("student_id")["student_name"].to_dict()
+                                    if "student_id" in result_df.columns:
+                                        result_df.insert(
+                                            result_df.columns.get_loc("student_id") + 1,
+                                            "student_name",
+                                            result_df["student_id"].map(name_map)
+                                        )
+                            except Exception as e:
+                                pass
+                                
                         st.session_state["ews_result_df"] = result_df
                         st.success(f"✅ Đã chạy phân tích thành công cho {len(result_df)} học sinh!")
 
         else:  # Tải lên file mới
             st.info(f"File CSV/Excel tải lên phải chứa đầy đủ 15 cột đặc trưng: {', '.join(FEATURE_COLUMNS[:4])}...")
 
-            # Tải mẫu
-            features_df = load_features_if_exists()
-            if features_df is not None:
-                sample = features_df[FEATURE_COLUMNS].head(5)
-                col_sdown1, col_sdown2 = st.columns(2)
-                with col_sdown1:
+            # Lựa chọn kiểu dữ liệu cho tệp mẫu (Được tạo động gồm 1 lớp học 40 học sinh, có 20 học sinh phân bổ rủi ro đều)
+            is_mid_sem_sample = st.checkbox(
+                "📅 Tải tệp mẫu ở trạng thái GIỮA KỲ (Chưa có điểm thi cuối kỳ)",
+                value=False,
+                help="Nếu tích chọn, tệp mẫu tải xuống sẽ chứa điểm số mô phỏng thời điểm giữa kỳ (không có điểm cuối kỳ) phục vụ cho kịch bản chạy thử nghiệm cảnh báo sớm trong kỳ học."
+            )
+            
+            sample = generate_class_sample_data(is_mid_semester=is_mid_sem_sample)
+            filename_suffix = "_giua_ky" if is_mid_sem_sample else "_cuoi_ky"
+            
+            col_sdown1, col_sdown2 = st.columns(2)
+            with col_sdown1:
+                st.download_button(
+                    f"📥 Tải file CSV mẫu (Lớp 9A1{filename_suffix.replace('_', ' ')})",
+                    sample.to_csv(index=False, encoding="utf-8-sig"),
+                    f"sample_batch_input{filename_suffix}.csv", "text/csv",
+                    use_container_width=True,
+                    help="Tải file mẫu dạng CSV chứa hồ sơ 40 học sinh lớp 9A1 để chạy thử nghiệm."
+                )
+            with col_sdown2:
+                try:
+                    excel_sample = to_excel(sample)
                     st.download_button(
-                        "📥 Tải file CSV mẫu",
-                        sample.to_csv(index=False, encoding="utf-8-sig"),
-                        "sample_batch_input.csv", "text/csv",
+                        f"📥 Tải file Excel mẫu (.xlsx)",
+                        excel_sample, f"sample_batch_input{filename_suffix}.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         use_container_width=True,
+                        help="Tải file mẫu dạng Excel chứa hồ sơ 40 học sinh lớp 9A1 để chạy thử nghiệm."
                     )
-                with col_sdown2:
-                    try:
-                        excel_sample = to_excel(sample)
-                        st.download_button(
-                            "📥 Tải file Excel mẫu (.xlsx)",
-                            excel_sample, "sample_batch_input.xlsx",
-                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            use_container_width=True,
-                        )
-                    except Exception as e:
-                        st.error(f"Lỗi xuất Excel mẫu: {e}")
+                except Exception as e:
+                    st.error(f"Lỗi xuất Excel mẫu: {e}")
 
             batch_file = st.file_uploader("Upload file CSV hoặc Excel", type=["csv", "xlsx"], key="batch_upload")
+
+            # Thêm radio button để tự động bổ sung cột is_mid_semester
+            upload_is_mid_sem = st.radio(
+                "📅 Dữ liệu trong file tải lên thuộc thời điểm:",
+                ["📝 Cả năm (Đầy đủ điểm thi cuối kỳ)", "📅 Giữa học kỳ (Chưa thi cuối kỳ)"],
+                horizontal=True,
+                key="upload_is_mid_sem_choice"
+            )
 
             if batch_file is not None:
                 try:
@@ -922,14 +1275,35 @@ with tab6:
                         batch_df = pd.read_csv(batch_file, encoding="utf-8-sig")
                     st.write(f"📊 Đã tải **{len(batch_df)}** dòng dữ liệu từ file.")
 
-                    # Validate
-                    missing_cols = [col for col in FEATURE_COLUMNS if col not in batch_df.columns]
+                    # Tự động gán/bổ sung cột is_mid_semester dựa trên lựa chọn giao diện
+                    is_mid_sem_val = 1 if "Giữa học kỳ" in upload_is_mid_sem else 0
+                    batch_df["is_mid_semester"] = is_mid_sem_val
+
+                    # Validate các cột đặc trưng còn lại (ngoại trừ is_mid_semester đã được xử lý)
+                    required_cols = [col for col in FEATURE_COLUMNS if col != "is_mid_semester"]
+                    missing_cols = [col for col in required_cols if col not in batch_df.columns]
                     if missing_cols:
-                        st.error(f"❌ File thiếu cột đặc trưng: {missing_cols}")
+                        st.error(f"❌ File thiếu cột đặc trưng bắt buộc: {missing_cols}")
                     else:
                         if st.button("🔮 Chạy dự đoán & Phân tích rủi ro EWS", type="primary", use_container_width=True):
                             with st.spinner("Đang chạy mô hình AI và phân tích rủi ro..."):
                                 result_df = predict_batch(batch_df)
+                                
+                                # Chèn tên học sinh từ file profiles thô
+                                if "student_name" not in result_df.columns and STUDENT_PROFILES_FILE.exists():
+                                    try:
+                                        profiles_df = pd.read_csv(STUDENT_PROFILES_FILE, encoding="utf-8-sig")
+                                        if "student_name" in profiles_df.columns and "student_id" in profiles_df.columns:
+                                            name_map = profiles_df.set_index("student_id")["student_name"].to_dict()
+                                            if "student_id" in result_df.columns:
+                                                result_df.insert(
+                                                    result_df.columns.get_loc("student_id") + 1,
+                                                    "student_name",
+                                                    result_df["student_id"].map(name_map)
+                                                )
+                                    except Exception as e:
+                                        pass
+                                        
                                 st.session_state["ews_result_df"] = result_df
                                 st.success(f"✅ Dự đoán thành công cho {len(result_df)} học sinh!")
                 except Exception as e:
@@ -1017,36 +1391,36 @@ with tab6:
                 st.plotly_chart(plot_risk_by_class(result_df), use_container_width=True)
 
             # --- Emergency Action Report Export ---
-            st.subheader("📥 Xuất báo cáo danh sách can thiệp khẩn cấp")
-            emergency_df = result_df[result_df["risk_level"].isin(["🔴 Cao", "🟠 Cảnh báo"])].copy()
+            st.subheader("📥 Xuất báo cáo danh sách can thiệp & theo dõi")
+            emergency_df = result_df[result_df["risk_level"].isin(["🔴 Cao", "🟠 Cảnh báo", "🟡 Theo dõi"])].copy()
 
             col_bdown1, col_bdown2 = st.columns(2)
             with col_bdown1:
                 st.download_button(
-                    "📥 Tải danh sách can thiệp (CSV)",
+                    "📥 Tải danh sách can thiệp & theo dõi (CSV)",
                     emergency_df.to_csv(index=False, encoding="utf-8-sig"),
-                    "danh_sach_can_thiep_khan_cap.csv", "text/csv",
+                    "danh_sach_can_thiep_va_theo_doi.csv", "text/csv",
                     use_container_width=True,
-                    help="Chỉ xuất danh sách những học sinh có rủi ro Cao hoặc Cảnh báo để can thiệp kịp thời."
+                    help="Xuất danh sách những học sinh có rủi ro Cao, Cảnh báo hoặc Theo dõi để theo sát."
                 )
             with col_bdown2:
                 try:
                     excel_emergency = to_excel(emergency_df)
                     st.download_button(
-                        "📥 Tải danh sách can thiệp (Excel)",
-                        excel_emergency, "danh_sach_can_thiep_khan_cap.xlsx",
+                        "📥 Tải danh sách can thiệp & theo dõi (Excel)",
+                        excel_emergency, "danh_sach_can_thiep_va_theo_doi.xlsx",
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         use_container_width=True,
-                        help="Tải báo cáo can thiệp khẩn cấp dưới dạng Excel (.xlsx)."
+                        help="Tải báo cáo can thiệp và theo dõi dưới dạng Excel (.xlsx)."
                     )
                 except Exception as e:
                     st.error(f"Lỗi xuất Excel can thiệp: {e}")
 
             # --- Priority Alerts List ---
-            st.subheader("🔴 Danh sách cần can thiệp học thuật ưu tiên (Nguy cơ Cao & Cần hỗ trợ)")
+            st.subheader("🔴 Danh sách học sinh cần hỗ trợ & theo dõi (Cao, Cảnh báo, Theo dõi)")
             if not emergency_df.empty:
                 disp_emergency = emergency_df.copy()
-                cols_to_show = ["student_id", "class_name", "risk_level", "risk_score", "avg_score", "min_score", "attendance_rate", "assignment_completion_rate"]
+                cols_to_show = ["student_id", "student_name", "class_name", "risk_level", "risk_score", "avg_score", "min_score", "attendance_rate", "assignment_completion_rate"]
                 
                 # Chỉ lấy các cột thực tế tồn tại trong dataframe để hiển thị tránh KeyError
                 available_show_cols = [col for col in cols_to_show if col in disp_emergency.columns]
@@ -1054,6 +1428,7 @@ with tab6:
                 
                 rename_map = {
                     "student_id": "Mã học sinh",
+                    "student_name": "Tên học sinh",
                     "class_name": "Lớp",
                     "risk_level": "Mức độ rủi ro",
                     "risk_score": "Điểm rủi ro",
@@ -1072,8 +1447,13 @@ with tab6:
                 st.write("")
                 with st.expander("🔍 Tra cứu chi tiết cờ cảnh báo & Kế hoạch can thiệp từng học sinh", expanded=False):
                     if "student_id" in emergency_df.columns:
-                        student_ids_list = emergency_df["student_id"].tolist()
-                        selected_sid = st.selectbox("Chọn Mã học sinh để tra cứu chi tiết:", student_ids_list)
+                        if "student_name" in emergency_df.columns:
+                            id_name_map = {row["student_id"]: f"{row['student_id']} - {row['student_name']}" for idx, row in emergency_df.iterrows()}
+                            selected_sid_label = st.selectbox("Chọn Học sinh để tra cứu chi tiết:", list(id_name_map.values()))
+                            selected_sid = [k for k, v in id_name_map.items() if v == selected_sid_label][0]
+                        else:
+                            student_ids_list = emergency_df["student_id"].tolist()
+                            selected_sid = st.selectbox("Chọn Mã học sinh để tra cứu chi tiết:", student_ids_list)
                         stud_data = emergency_df[emergency_df["student_id"] == selected_sid].iloc[0]
                     else:
                         st.info("ℹ️ Không tìm thấy cột 'student_id' trong file. Tra cứu theo dòng dữ liệu:")
@@ -1085,7 +1465,10 @@ with tab6:
 
                     if selected_sid:
                         class_lbl = stud_data.get("class_name", "Chung (Không chia lớp)")
-                        st.markdown(f"#### 👤 Học sinh: `{selected_sid}` | Lớp: `{class_lbl}`")
+                        if "student_name" in stud_data.index and pd.notna(stud_data["student_name"]):
+                            st.markdown(f"#### 👤 Học sinh: `{selected_sid}` - **{stud_data['student_name']}** | Lớp: `{class_lbl}`")
+                        else:
+                            st.markdown(f"#### 👤 Học sinh: `{selected_sid}` | Lớp: `{class_lbl}`")
 
 
                         col_stud1, col_stud2 = st.columns(2)
@@ -1108,9 +1491,21 @@ with tab6:
 
             # --- Full Dataset Predictions ---
             st.subheader("📋 Bảng kết quả dự đoán & Chỉ số rủi ro đầy đủ")
-            full_display_cols = ["student_id", "class_name", "final_prediction", "risk_level", "risk_score", "attendance_rate", "avg_score"]
+            full_display_cols = ["student_id", "student_name", "class_name", "final_prediction", "risk_level", "risk_score", "attendance_rate", "avg_score"]
             available_full_cols = [col for col in full_display_cols if col in result_df.columns]
-            st.dataframe(result_df[available_full_cols], use_container_width=True, hide_index=True)
+            
+            full_rename_map = {
+                "student_id": "Mã học sinh",
+                "student_name": "Tên học sinh",
+                "class_name": "Lớp",
+                "final_prediction": "AI Dự báo học lực",
+                "risk_level": "Mức độ rủi ro",
+                "risk_score": "Điểm rủi ro",
+                "attendance_rate": "Chuyên cần (%)",
+                "avg_score": "ĐTB chung"
+            }
+            available_rename_map = {k: v for k, v in full_rename_map.items() if k in available_full_cols}
+            st.dataframe(result_df[available_full_cols].rename(columns=available_rename_map), use_container_width=True, hide_index=True)
 
 
             # Tải toàn bộ

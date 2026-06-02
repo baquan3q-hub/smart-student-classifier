@@ -99,21 +99,30 @@ def predict_one(
     else:
         class_proba = {CLASS_LABELS[i]: round(float(p) * 100, 1) for i, p in enumerate(rf_proba)}
 
-    # Rule Engine result
-    rule_result = None
-    rule_reason = "Không đủ dữ liệu để chạy Rule Engine."
-    if score_averages is not None and comment_statuses is not None:
-        rule_result = classify_learning_result(score_averages, comment_statuses)
-        rule_reason = get_classification_reason(score_averages, comment_statuses, rule_result)
-
     # Final prediction: Hybrid decision (ML + Safeguard BGDDT)
     # Lớp bảo vệ kiến trúc (Architectural Safeguard): Áp dụng các luật loại trừ bắt buộc của Bộ GD&ĐT
     comment_fail = features.get("comment_not_pass_count", 0)
     score_lt_3_5 = features.get("count_score_lt_3_5", 0)
     attendance = features.get("attendance_rate", 100)
 
-    if comment_fail >= 2 or score_lt_3_5 > 0 or attendance < 75:
+    # Rule Engine result
+    rule_result = None
+    rule_reason = "Không đủ dữ liệu để chạy Rule Engine."
+    if score_averages is not None and comment_statuses is not None:
+        rule_result = classify_learning_result(score_averages, comment_statuses, attendance)
+        rule_reason = get_classification_reason(score_averages, comment_statuses, rule_result, attendance)
+
+    if attendance < 75 or comment_fail >= 2 or score_lt_3_5 >= 2:
         final_prediction = "Chưa đạt"
+    elif score_lt_3_5 == 1:
+        # Nếu chỉ có 1 môn dưới 3.5, kiểm tra xem Rule Engine có điều chỉnh nâng bậc lên "Đạt" không
+        if rule_result == "Đạt":
+            final_prediction = "Đạt" if rf_prediction in ["Tốt", "Khá"] else rf_prediction
+        else:
+            final_prediction = "Chưa đạt"
+    elif comment_fail == 1:
+        # Luật Thông tư 22: Có đúng 1 môn nhận xét Chưa đạt -> Tối đa xếp loại Đạt
+        final_prediction = "Đạt" if rf_prediction in ["Tốt", "Khá"] else rf_prediction
     else:
         final_prediction = rf_prediction
 
@@ -220,10 +229,18 @@ def predict_batch(
         score_lt_3_5 = int(row.get("count_score_lt_3_5", 0))
         attendance = row.get("attendance_rate", 100)
 
-        if comment_fail >= 2 or score_lt_3_5 > 0 or attendance < 75:
+        if attendance < 75 or comment_fail >= 2 or score_lt_3_5 >= 2:
             final_pred = "Chưa đạt"
+        elif score_lt_3_5 == 1:
+            if rule_res == "Đạt":
+                final_pred = "Đạt" if rf_pred in ["Tốt", "Khá"] else rf_pred
+            else:
+                final_pred = "Chưa đạt"
+        elif comment_fail == 1:
+            # Luật Thông tư 22: Có đúng 1 môn nhận xét Chưa đạt -> Tối đa xếp loại Đạt
+            final_pred = "Đạt" if rf_pred in ["Tốt", "Khá"] else rf_pred
         else:
-            final_pred = row["rf_prediction"]
+            final_pred = rf_pred
         final_preds.append(final_pred)
 
         # Ước lượng kết quả Rule Engine
@@ -232,7 +249,7 @@ def predict_batch(
         score_avgs = [avg_score, min_score] + [avg_score] * 6
         comment_stats = ["Đạt"] * max(0, 3 - comment_fail) + ["Chưa đạt"] * comment_fail
         
-        rule_res = classify_learning_result(score_avgs, comment_stats)
+        rule_res = classify_learning_result(score_avgs, comment_stats, attendance_rate=attendance)
         rule_engine_results.append(rule_res)
 
         dt_pred = row["dt_prediction"]
