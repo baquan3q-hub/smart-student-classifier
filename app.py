@@ -44,6 +44,40 @@ from src.visualization import (
 )
 from src.utils import get_label_emoji, get_label_color
 
+
+def get_student_raw_table(student_features: dict) -> pd.DataFrame:
+    """
+    Tạo bảng hiển thị các dữ liệu thô gốc và chỉ số đặc trưng của học sinh được nhập vào.
+    """
+    comp_features = [
+        "avg_score", "min_score", "max_score", "std_score",
+        "count_score_ge_8", "count_score_ge_6_5", "count_score_ge_5", "count_score_lt_3_5",
+        "comment_not_pass_count", "attendance_rate", "assignment_completion_rate", 
+        "participation_score", "behavior_score", "teacher_evaluation_score", "progress_delta"
+    ]
+    
+    rows = []
+    for col in comp_features:
+        vi_name = FEATURE_NAMES_VI.get(col, col)
+        val = student_features.get(col, 0.0)
+        # Định dạng hiển thị đẹp
+        if col in ["attendance_rate", "assignment_completion_rate"]:
+            display_val = f"{round(float(val), 1)}%"
+        elif col in ["count_score_ge_8", "count_score_ge_6_5", "count_score_ge_5", "count_score_lt_3_5", "comment_not_pass_count"]:
+            display_val = int(val)
+        elif col in ["progress_delta"]:
+            display_val = f"{float(val):+.1f}" if float(val) != 0 else "0.0"
+        else:
+            display_val = round(float(val), 2)
+            
+        rows.append({
+            "Chỉ số học tập & hành vi": vi_name,
+            "Giá trị thực tế": display_val
+        })
+        
+    return pd.DataFrame(rows)
+
+
 # ============================================================
 # CẤU HÌNH TRANG
 # ============================================================
@@ -602,12 +636,48 @@ with tab5:
                         final_label = pred["final_prediction"]
                         st.metric("🎯 Kết quả cuối cùng", f"{get_label_emoji(final_label)} {final_label}")
 
-                    st.metric("📊 Độ tin cậy", f"{pred['confidence']}%")
+                    col_conf1, col_conf2 = st.columns([1, 2])
+                    with col_conf1:
+                        st.metric(
+                            "📊 Độ tin cậy đồng thuận", 
+                            f"{pred['consensus_confidence']}%",
+                            help=f"Độ tin cậy gốc từ Random Forest: {pred['confidence']}%. Trạng thái: {pred['consensus_status']}"
+                        )
+                    with col_conf2:
+                        st.info(f"🔍 **Trạng thái đồng thuận**: {pred['consensus_status']}")
 
-                    # Probabilities
-                    st.subheader("📊 Xác suất dự đoán (Random Forest)")
-                    proba_df = pd.DataFrame([pred["class_probabilities"]])
-                    st.dataframe(proba_df, use_container_width=True, hide_index=True)
+                    if pred['consensus_confidence'] < 60.0:
+                        st.warning(
+                            f"⚠️ **Học lực thuộc vùng ranh giới (Borderline Case)**: Độ tin cậy đồng thuận đạt {pred['consensus_confidence']}%. "
+                            f"Học lực của học sinh đang ở vùng ranh giới giữa các xếp loại và có thể thay đổi nếu có dao động nhỏ về điểm số hoặc nhận xét. "
+                            f"Hãy theo dõi kỹ lộ trình nâng bậc bên dưới."
+                        )
+
+                    # Vẽ biểu đồ phân phối xác suất bằng Plotly
+                    import plotly.express as px
+                    proba_data = pred["class_probabilities"]
+                    df_proba = pd.DataFrame({
+                        "Xếp loại": list(proba_data.keys()),
+                        "Xác suất (%)": list(proba_data.values())
+                    }).sort_values("Xác suất (%)", ascending=True)
+                    
+                    fig_proba = px.bar(
+                         df_proba, 
+                         x="Xác suất (%)", 
+                         y="Xếp loại", 
+                         orientation="h",
+                         title="📊 Phân phối Xác suất Dự báo các Xếp loại (Random Forest)",
+                         text="Xác suất (%)",
+                         color="Xếp loại",
+                         color_discrete_map={
+                             "Tốt": "#10B981",
+                             "Khá": "#3B82F6",
+                             "Đạt": "#F59E0B",
+                             "Chưa đạt": "#EF4444"
+                         }
+                    )
+                    fig_proba.update_layout(showlegend=False, height=250, margin=dict(l=20, r=20, t=40, b=20))
+                    st.plotly_chart(fig_proba, use_container_width=True)
 
                     # Lý do
                     st.subheader("📝 Giải thích")
@@ -625,6 +695,15 @@ with tab5:
                     st.markdown(f"**Mức độ rủi ro:** <span style='color:{risk_color}; font-weight:bold;'>{risk_level}</span>", unsafe_allow_html=True)
                     for rec in generate_recommendations(final_label, features_input):
                         st.write(rec)
+
+                    # Bảng dữ liệu học sinh
+                    st.markdown("---")
+                    st.subheader("📋 Bảng tổng hợp dữ liệu học sinh")
+                    st.markdown(
+                        "Dưới đây là bảng tổng hợp các chỉ số đặc trưng (dữ liệu đã xử lý) của học sinh được nhập vào để dự đoán:"
+                    )
+                    raw_table_df = get_student_raw_table(features_input)
+                    st.dataframe(raw_table_df, use_container_width=True, hide_index=True)
 
                 except Exception as e:
                     st.error(f"❌ Lỗi dự đoán: {e}")
@@ -706,7 +785,48 @@ with tab5:
                     res_cols[2].metric("🌲 Random Forest", f"{get_label_emoji(pred['rf_prediction'])} {pred['rf_prediction']}")
                     res_cols[3].metric("🎯 Cuối cùng", f"{get_label_emoji(pred['final_prediction'])} {pred['final_prediction']}")
 
-                    st.metric("📊 Độ tin cậy", f"{pred['confidence']}%")
+                    col_conf1, col_conf2 = st.columns([1, 2])
+                    with col_conf1:
+                        st.metric(
+                            "📊 Độ tin cậy đồng thuận", 
+                            f"{pred['consensus_confidence']}%",
+                            help=f"Độ tin cậy gốc từ Random Forest: {pred['confidence']}%. Trạng thái: {pred['consensus_status']}"
+                        )
+                    with col_conf2:
+                        st.info(f"🔍 **Trạng thái đồng thuận**: {pred['consensus_status']}")
+
+                    if pred['consensus_confidence'] < 60.0:
+                        st.warning(
+                            f"⚠️ **Học lực thuộc vùng ranh giới (Borderline Case)**: Độ tin cậy đồng thuận đạt {pred['consensus_confidence']}%. "
+                            f"Học lực của học sinh đang ở vùng ranh giới giữa các xếp loại và có thể thay đổi nếu có dao động nhỏ về điểm số hoặc nhận xét. "
+                            f"Hãy theo dõi kỹ lộ trình nâng bậc bên dưới."
+                        )
+
+                    # Vẽ biểu đồ phân phối xác suất bằng Plotly
+                    import plotly.express as px
+                    proba_data = pred["class_probabilities"]
+                    df_proba = pd.DataFrame({
+                        "Xếp loại": list(proba_data.keys()),
+                        "Xác suất (%)": list(proba_data.values())
+                    }).sort_values("Xác suất (%)", ascending=True)
+                    
+                    fig_proba = px.bar(
+                         df_proba, 
+                         x="Xác suất (%)", 
+                         y="Xếp loại", 
+                         orientation="h",
+                         title="📊 Phân phối Xác suất Dự báo các Xếp loại (Random Forest)",
+                         text="Xác suất (%)",
+                         color="Xếp loại",
+                         color_discrete_map={
+                             "Tốt": "#10B981",
+                             "Khá": "#3B82F6",
+                             "Đạt": "#F59E0B",
+                             "Chưa đạt": "#EF4444"
+                         }
+                    )
+                    fig_proba.update_layout(showlegend=False, height=250, margin=dict(l=20, r=20, t=40, b=20))
+                    st.plotly_chart(fig_proba, use_container_width=True)
 
                     col_e1, col_e2 = st.columns(2)
                     with col_e1:
@@ -716,6 +836,15 @@ with tab5:
                         st.write("**💡 Khuyến nghị:**")
                         for rec in generate_recommendations(pred["final_prediction"], features_input):
                             st.write(rec)
+
+                    # Bảng dữ liệu học sinh
+                    st.markdown("---")
+                    st.subheader("📋 Bảng tổng hợp dữ liệu học sinh")
+                    st.markdown(
+                        "Dưới đây là bảng tổng hợp các chỉ số đặc trưng (dữ liệu đã xử lý) của học sinh được nhập vào để dự đoán:"
+                    )
+                    raw_table_df = get_student_raw_table(features_input)
+                    st.dataframe(raw_table_df, use_container_width=True, hide_index=True)
 
                 except Exception as e:
                     st.error(f"❌ Lỗi: {e}")

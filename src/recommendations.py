@@ -64,8 +64,59 @@ def generate_recommendations(
     if features:
         personal = _generate_personal_recommendations(label, features)
         recommendations.extend(personal)
+        
+        upgrade_path = generate_upgrade_path(label, features)
+        recommendations.extend(upgrade_path)
 
     return recommendations
+
+
+def generate_upgrade_path(label: str, features: dict) -> list[str]:
+    """Phân tích các điều kiện ranh giới và chỉ ra lộ trình cụ thể để nâng bậc học lực."""
+    path_recs = []
+    
+    attendance = features.get("attendance_rate", 100)
+    avg_score = features.get("avg_score", 0.0)
+    min_score = features.get("min_score", 0.0)
+    count_ge_8 = int(features.get("count_score_ge_8", 0))
+    count_ge_6_5 = int(features.get("count_score_ge_6_5", 0))
+    count_ge_5 = int(features.get("count_score_ge_5", 0))
+    comment_fail = int(features.get("comment_not_pass_count", 0))
+
+    if label == "Chưa đạt":
+        path_recs.append("🎯 **Lộ trình nâng lên mức ĐẠT:**")
+        if attendance < 75:
+            path_recs.append(f"  - 📅 Cải thiện chuyên cần: Cần đi học đầy đủ hơn để tăng tỷ lệ chuyên cần từ {attendance}% lên trên 75% (tránh bị lưu ban bắt buộc).")
+        if comment_fail > 1:
+            path_recs.append(f"  - 🎨 Hoàn thành môn nhận xét: Cần cải thiện các môn nhận xét để chỉ còn tối đa 1 môn Chưa đạt (hiện tại có {comment_fail} môn).")
+        if count_ge_5 < 6:
+            path_recs.append(f"  - 📚 Nâng điểm các môn yếu: Cố gắng học tập để đạt ĐTB môn ≥ 5.0 cho ít nhất 6 môn học (hiện mới có {count_ge_5} môn).")
+        if min_score < 3.5:
+            path_recs.append(f"  - 🚨 Khắc phục điểm liệt: Cần phụ đạo gấp môn có điểm thấp nhất ({min_score}) để nâng lên trên 3.5.")
+            
+    elif label == "Đạt":
+        path_recs.append("🎯 **Lộ trình nâng lên mức KHÁ:**")
+        if comment_fail > 0:
+            path_recs.append(f"  - 🎨 Hoàn thành môn nhận xét: Cần đạt 100% môn nhận xét Đạt (hiện tại có {comment_fail} môn Chưa đạt).")
+        if min_score < 5.0:
+            path_recs.append(f"  - 🚨 Cải thiện môn yếu nhất: Điểm thấp nhất hiện tại là {min_score}, cần nâng môn này lên ≥ 5.0.")
+        if count_ge_6_5 < 6:
+            path_recs.append(f"  - 📈 Tăng số môn khá: Cần phấn đấu thêm {6 - count_ge_6_5} môn nữa đạt ĐTB ≥ 6.5 (hiện tại có {count_ge_6_5} môn).")
+            
+    elif label == "Khá":
+        path_recs.append("🎯 **Lộ trình nâng lên mức TỐT:**")
+        if comment_fail > 0:
+            path_recs.append(f"  - 🎨 Hoàn thành môn nhận xét: Cần đạt 100% môn nhận xét Đạt (hiện tại có {comment_fail} môn Chưa đạt).")
+        if min_score < 6.5:
+            path_recs.append(f"  - 🚨 Cải thiện môn yếu nhất: Điểm thấp nhất hiện tại là {min_score}, cần nâng môn này lên ≥ 6.5 (Quy chế học sinh Tốt không có môn nào dưới 6.5).")
+        if count_ge_8 < 6:
+            path_recs.append(f"  - 🌟 Tăng số môn xuất sắc: Cần phấn đấu thêm {6 - count_ge_8} môn đạt ĐTB ≥ 8.0 (hiện tại có {count_ge_8} môn).")
+
+    elif label == "Tốt":
+        path_recs.append("🎯 **Duy trì thành tích TỐT:**")
+        path_recs.append("  - 🌟 Chúc mừng em đã đạt mức học lực Tốt! Hãy tiếp tục duy trì phương pháp học tập tích cực hiện tại và phát duy thế mạnh bản thân.")
+        
+    return path_recs
 
 
 def _generate_personal_recommendations(

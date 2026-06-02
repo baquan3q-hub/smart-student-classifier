@@ -117,12 +117,49 @@ def predict_one(
     else:
         final_prediction = rf_prediction
 
+    # Tính độ tin cậy đồng thuận kết hợp (Consensus Confidence Score)
+    consensus_conf = confidence
+    consensus_status = "Đồng thuận trung bình"
+    
+    if rule_result is not None:
+        if rule_result == dt_prediction == rf_prediction == final_prediction:
+            consensus_conf = min(100.0, confidence + 10.0)
+            consensus_status = "Đồng thuận hoàn toàn"
+        else:
+            status_parts = []
+            if dt_prediction != rf_prediction:
+                consensus_conf -= 10.0
+                status_parts.append("ML lệch nhau (-10%)")
+            priority = {"Chưa đạt": 0, "Đạt": 1, "Khá": 2, "Tốt": 3}
+            rule_pri = priority.get(rule_result, 0)
+            final_pri = priority.get(final_prediction, 0)
+            if rule_pri < final_pri:
+                consensus_conf -= 15.0
+                status_parts.append("Luật Bộ GD&ĐT thấp hơn ML (-15%)")
+            elif rule_result != final_prediction:
+                consensus_conf -= 10.0
+                status_parts.append("Luật Bộ GD&ĐT lệch với ML (-10%)")
+            
+            consensus_conf = max(0.0, consensus_conf)
+            consensus_status = f"Mâu thuẫn: {', '.join(status_parts)}" if status_parts else "Đồng thuận cục bộ"
+    else:
+        if dt_prediction == rf_prediction == final_prediction:
+            consensus_conf = min(100.0, confidence + 5.0)
+            consensus_status = "Đồng thuận ML"
+        else:
+            consensus_conf = max(0.0, confidence - 10.0)
+            consensus_status = "ML lệch nhau (-10%)"
+
+    consensus_confidence = round(consensus_conf, 1)
+
     return {
         "rule_engine_result": rule_result,
         "dt_prediction": dt_prediction,
         "rf_prediction": rf_prediction,
         "final_prediction": final_prediction,
         "confidence": confidence,
+        "consensus_confidence": consensus_confidence,
+        "consensus_status": consensus_status,
         "class_probabilities": class_proba,
         "rule_reason": rule_reason,
         "features": features,
@@ -172,19 +209,69 @@ def predict_batch(
     result_df["dt_prediction"] = dt_preds
     result_df["rf_prediction"] = rf_preds
     
-    # Final prediction: Hybrid decision (ML + Safeguard BGDDT)
+    # Final prediction & Consensus Confidence calculation
     final_preds = []
+    consensus_confidences = []
+    consensus_statuses = []
+    rule_engine_results = []
+
     for idx, row in result_df.iterrows():
-        comment_fail = row.get("comment_not_pass_count", 0)
-        score_lt_3_5 = row.get("count_score_lt_3_5", 0)
+        comment_fail = int(row.get("comment_not_pass_count", 0))
+        score_lt_3_5 = int(row.get("count_score_lt_3_5", 0))
         attendance = row.get("attendance_rate", 100)
+
         if comment_fail >= 2 or score_lt_3_5 > 0 or attendance < 75:
-            final_preds.append("Chưa đạt")
+            final_pred = "Chưa đạt"
         else:
-            final_preds.append(row["rf_prediction"])
-            
+            final_pred = row["rf_prediction"]
+        final_preds.append(final_pred)
+
+        # Ước lượng kết quả Rule Engine
+        avg_score = row.get("avg_score", 0.0)
+        min_score = row.get("min_score", 0.0)
+        score_avgs = [avg_score, min_score] + [avg_score] * 6
+        comment_stats = ["Đạt"] * max(0, 3 - comment_fail) + ["Chưa đạt"] * comment_fail
+        
+        rule_res = classify_learning_result(score_avgs, comment_stats)
+        rule_engine_results.append(rule_res)
+
+        dt_pred = row["dt_prediction"]
+        rf_pred = row["rf_prediction"]
+        conf = confidences[idx]
+
+        # Tính toán độ tin cậy đồng thuận kết hợp
+        consensus_conf = conf
+        consensus_status = "Đồng thuận trung bình"
+
+        if rule_res == dt_pred == rf_pred == final_pred:
+            consensus_conf = min(100.0, conf + 10.0)
+            consensus_status = "Đồng thuận hoàn toàn"
+        else:
+            status_parts = []
+            if dt_pred != rf_pred:
+                consensus_conf -= 10.0
+                status_parts.append("ML lệch nhau (-10%)")
+            priority = {"Chưa đạt": 0, "Đạt": 1, "Khá": 2, "Tốt": 3}
+            rule_pri = priority.get(rule_res, 0)
+            final_pri = priority.get(final_pred, 0)
+            if rule_pri < final_pri:
+                consensus_conf -= 15.0
+                status_parts.append("Luật Bộ GD&ĐT thấp hơn ML (-15%)")
+            elif rule_res != final_pred:
+                consensus_conf -= 10.0
+                status_parts.append("Luật Bộ GD&ĐT lệch với ML (-10%)")
+
+            consensus_conf = max(0.0, consensus_conf)
+            consensus_status = f"Mâu thuẫn: {', '.join(status_parts)}" if status_parts else "Đồng thuận cục bộ"
+
+        consensus_confidences.append(round(consensus_conf, 1))
+        consensus_statuses.append(consensus_status)
+
+    result_df["rule_engine_result"] = rule_engine_results
     result_df["final_prediction"] = final_preds
     result_df["confidence"] = confidences
+    result_df["consensus_confidence"] = consensus_confidences
+    result_df["consensus_status"] = consensus_statuses
 
     # Tích hợp Early Warning System phân tích chỉ số rủi ro
     from src.early_warning import analyze_batch_ews

@@ -23,6 +23,7 @@ from typing import Optional
 
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
@@ -59,25 +60,41 @@ def train_decision_tree(
 def train_random_forest(
     X_train: pd.DataFrame,
     y_train: pd.Series,
-) -> RandomForestClassifier:
+) -> CalibratedClassifierCV:
     """
-    Huấn luyện Random Forest Classifier.
+    Huấn luyện Random Forest Classifier với hiệu chuẩn xác suất (CalibratedClassifierCV).
 
     Args:
         X_train: Features huấn luyện.
         y_train: Labels huấn luyện.
 
     Returns:
-        Mô hình Random Forest đã train.
+        Mô hình Random Forest đã hiệu chuẩn.
     """
-    model = RandomForestClassifier(**RF_PARAMS)
+    base_model = RandomForestClassifier(**RF_PARAMS)
+    model = CalibratedClassifierCV(base_model, method="sigmoid", cv=5)
     model.fit(X_train, y_train)
+    
+    # Tính trung bình feature importances từ các base estimators của CalibratedClassifierCV
+    # để đảm bảo khả năng tương thích ngược với các hàm giải thích và đánh giá
+    try:
+        importances = []
+        for c in model.calibrated_classifiers_:
+            if hasattr(c, "estimator"):
+                importances.append(c.estimator.feature_importances_)
+            elif hasattr(c, "base_estimator"):
+                importances.append(c.base_estimator.feature_importances_)
+        if importances:
+            model.feature_importances_ = np.mean(importances, axis=0)
+    except Exception as e:
+        print(f"Warning: Không thể tính toán feature importances cho mô hình hiệu chuẩn: {e}")
+        
     return model
 
 
 def save_models(
     dt_model: DecisionTreeClassifier,
-    rf_model: RandomForestClassifier,
+    rf_model: CalibratedClassifierCV,
     label_encoder: LabelEncoder,
 ) -> None:
     """Lưu models và label encoder bằng joblib."""
@@ -87,7 +104,7 @@ def save_models(
     joblib.dump(label_encoder, LABEL_ENCODER_FILE)
 
 
-def load_models() -> tuple[Optional[DecisionTreeClassifier], Optional[RandomForestClassifier], Optional[LabelEncoder]]:
+def load_models() -> tuple[Optional[DecisionTreeClassifier], Optional[CalibratedClassifierCV], Optional[LabelEncoder]]:
     """
     Load models đã lưu.
 
